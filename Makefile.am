@@ -6,6 +6,7 @@ krb5module_la_SOURCES=krb5defines.h krb5module.c krb5module.h \
 	krb5err.c krb5err.h
 krb5module_la_LDFLAGS=-module -avoid-version
 krb5module_la_LIBADD=$(KRB5_LIBS)
+krb5module_la_DEPS=krb5defines.h
 
 DEFFILES=$(KRB5_HEADERDIR)/krb5.h
 krb5defines.h: $(DEFFILES) gendefines.awk
