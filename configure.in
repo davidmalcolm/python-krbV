@@ -1,6 +1,6 @@
 AC_INIT
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(krbVmodule, 1.0.3)
+AM_INIT_AUTOMAKE(krbVmodule, 1.0.5)
 
 AC_PREFIX_DEFAULT(/usr)
 

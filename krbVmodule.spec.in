@@ -1,4 +1,4 @@
-%define pyver 2.1
+%define pyver 2.2
 
 Summary: Python extension module for Kerberos 5
 Name: krbV-python%{pyver}

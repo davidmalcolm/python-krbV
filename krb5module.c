@@ -1687,6 +1687,7 @@ CCache_principal(PyObject *unself, PyObject *args, PyObject *kw)
       Py_INCREF(retval);
       return retval;
     }
+  PyErr_Clear();
 
   conobj = tmp = PyObject_GetAttrString(self, "context");
   if(tmp)
@@ -1892,7 +1893,7 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 static PyMethodDef ccache_methods[] = {
   {"__init__", (PyCFunction)CCache_init, METH_VARARGS|METH_KEYWORDS},
   {"__eq__", (PyCFunction)CCache_eq, METH_VARARGS},
-  {"principal", (PyCFunction)CCache_principal, METH_VARARGS},
+  {"principal", (PyCFunction)CCache_principal, METH_VARARGS|METH_KEYWORDS},
   {"get_credentials", (PyCFunction)CCache_get_credentials, METH_VARARGS|METH_KEYWORDS},
   {"init_creds_keytab", (PyCFunction)CCache_init_creds_keytab, METH_VARARGS|METH_KEYWORDS},
   {NULL, NULL}
