@@ -37,10 +37,10 @@ AC_DEFUN([AM_PATH_PYTHON_JH],
   dnl in 1.5, and I don't want to maintain that logic.
 
   dnl should we do the version check?
-  ifelse([$1],[AC_PATH_PROG(PYTHON, python python2.1 python2.0 python1.6 python1.5)],,[
+  ifelse([$1],[AC_PATH_PROG(PYTHON, python python2.2 python2.1 python2.0 python1.6 python1.5)],,[
   foundit=false
   AC_MSG_CHECKING(if Python version >= $1)
- for PYTHON_BASE in python2.1 python2.0 python1.6 python1.5 python; do
+ for PYTHON_BASE in python2.2 python2.1 python2.0 python1.6 python1.5 python; do
     AC_PATH_PROG(PYTHON, $PYTHON_BASE)
     changequote(<<, >>)dnl
     prog="

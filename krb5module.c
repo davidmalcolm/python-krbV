@@ -669,7 +669,7 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
       keytab = PyDict_GetItemString(kw, "keytab");
     }
 
-  if(!keytab)
+  if(!keytab || keytab == Py_None)
     {
       PyObject *subargs;
       subargs = Py_BuildValue("(O)", self);
@@ -2414,9 +2414,9 @@ static PyMethodDef krb5_functions[] = {
 };
 
 void
-initkrb5(void)
+initkrbV(void)
 {
-  PyObject *module = Py_InitModule("krb5", krb5_functions);
+  PyObject *module = Py_InitModule("krbV", krb5_functions);
   PyObject *dict, *revdict;
   PyObject *modname;
 
