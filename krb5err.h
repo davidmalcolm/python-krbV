@@ -2,7 +2,9 @@
 #define KRB5ERR_H 1
 
 #include <krb5.h>
+#ifndef __COM_ERR_H__
 #include <com_err.h>
+#endif
 
 extern PyObject *pk_exception;
 

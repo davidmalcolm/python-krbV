@@ -9,6 +9,7 @@
  * Written by Elliot Lee <sopwith@redhat.com>
  * Not completely tested (yet).
  */
+#define KRB5_PRIVATE 1
 #include "krb5module.h"
 #include "krb5err.h"
 #include "krb5util.h"
@@ -23,7 +24,7 @@
 #include <sys/signal.h>
 #include <stdio.h>
 
-#ifndef _KRB5_INT_H
+#if !defined(_KRB5_INT_H) && defined(KRB5_PROTOTYPE)
 krb5_error_code krb5_get_krbhst KRB5_PROTOTYPE((krb5_context, const krb5_data *, char ***));
 krb5_error_code krb5_free_krbhst KRB5_PROTOTYPE((krb5_context, char * const *));
 #endif
@@ -1722,15 +1723,14 @@ CCache_getattr(PyObject *unself, PyObject *args)
 
   if(!strcmp(name, "name"))
     {
-      char *nom;
+      const char *nom;
 
       nom = krb5_cc_get_name(ctx, ccache);
       retval = PyString_FromString(nom);
-      //      free(nom);
     }
   else if(!strcmp(name, "type"))
     {
-      char *type;
+      const char *type;
 
       type = krb5_cc_get_type(ctx, ccache);
       if(type)
