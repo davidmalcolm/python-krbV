@@ -19,9 +19,12 @@ pk_error(krb5_error_code rc)
 	if(PyClass_Check(pk_exception))
 	  {
 	    PyObject *exc = PyObject_CallFunction(pk_exception, "OO", py_rc, py_msg);
+	    if(!exc)
+	      return NULL;
 	    PyObject_SetAttrString(exc, "err_code", py_rc);
 	    PyObject_SetAttrString(exc, "message", py_msg);
 	    PyErr_SetObject(pk_exception, exc);
+	    Py_DECREF(exc);
 	  }
 	else
 	  PyErr_SetObject(pk_exception, Py_BuildValue("OO", py_rc, py_msg));

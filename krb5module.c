@@ -19,6 +19,9 @@
 #include <sys/socket.h>
 #include <sys/param.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/signal.h>
+#include <stdio.h>
 
 #ifndef _KRB5_INT_H
 krb5_error_code krb5_get_krbhst KRB5_PROTOTYPE((krb5_context, const krb5_data *, char ***));
@@ -411,6 +414,129 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
   return retval;
 }
 
+static int
+check_obj(PyObject *op)
+{
+#ifdef Py_DEBUG
+  return (!op->_ob_prev || !op->_ob_next ||
+	  op->_ob_prev->_ob_next != op || op->_ob_next->_ob_prev != op || op->ob_refcnt <= 0);
+#else
+  return 0;
+#endif
+}
+
+static PyObject *
+make_principal(PyObject *ctx_obj, krb5_context ctx, krb5_principal orig_princ)
+{
+  PyObject *subargs, *otmp, *mykw, *retval;
+  krb5_principal princ;
+
+  if(!orig_princ)
+    {
+      Py_INCREF(Py_None);
+      return NULL;
+    }
+  
+  krb5_copy_principal(ctx, orig_princ, &princ);
+  otmp = PyCObject_FromVoidPtrAndDesc(princ, ctx, destroy_principal);
+  subargs = Py_BuildValue("(O)", otmp);
+  mykw = PyDict_New();
+  PyDict_SetItemString(mykw, "context", ctx_obj);
+  retval = PyEval_CallObjectWithKeywords(principal_class, subargs, mykw);
+  Py_DECREF(subargs);
+  Py_XDECREF(mykw);
+  Py_DECREF(otmp);
+
+  return retval;
+}
+
+static PyObject *
+make_ticket_times(krb5_ticket_times *times)
+{
+  if(!times)
+    {
+      Py_INCREF(Py_None);
+      return Py_None;
+    }
+
+  return Py_BuildValue("(iiii)",
+		       times->authtime,
+		       times->starttime,
+		       times->endtime,
+		       times->renew_till);
+}
+
+static PyObject *
+make_transited(krb5_transited *transited)
+{
+  if(!transited)
+    {
+      Py_INCREF(Py_None);
+      return Py_None;
+    }
+
+  return Py_BuildValue("(iz#)",
+		       transited->tr_type,
+		       transited->tr_contents.data,
+		       transited->tr_contents.length);
+}
+
+static PyObject *
+make_keyblock(krb5_keyblock *keyblock)
+{
+  if(!keyblock)
+    {
+      Py_INCREF(Py_None);
+      return Py_None;
+    }
+
+  return Py_BuildValue("(iz#)",
+		       keyblock->enctype,
+		       keyblock->contents,
+		       keyblock->length);
+}
+
+static PyObject *
+make_authdata_list(krb5_authdata **authdata)
+{
+  int i, n;
+  PyObject *adlist;
+
+  if(!authdata)
+    {
+      Py_INCREF(Py_None);
+      return Py_None;
+    }
+  for(n = 0; authdata[n]; n++) /* */;
+  adlist = PyTuple_New(n);
+  for(i = 0; i < n; i++)
+    PyTuple_SetItem(adlist, i,
+		    Py_BuildValue("(iz#)", authdata[i]->ad_type, authdata[i]->contents,
+				  authdata[i]->length));
+  return adlist;
+}
+
+static PyObject *
+make_address_list(krb5_address **caddrs)
+{
+  PyObject *retval;
+  int i, n;
+
+  if(!caddrs)
+    {
+      Py_INCREF(Py_None);
+      return Py_None;
+    }
+
+  for(n = 0; caddrs[n]; n++) /* */;
+  retval = PyTuple_New(n);
+  for(i = 0; i < n; i++)
+    PyTuple_SetItem(retval, i,
+		    Py_BuildValue("(iz#)", caddrs[i]->addrtype, caddrs[i]->contents, caddrs[i]->length));
+
+  return retval;
+}
+
 static PyObject*
 Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
 {
@@ -433,6 +559,8 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
 
+  assert(!check_obj(args));
+  
   if(auth_context)
     {
       tmp = PyObject_GetAttrString(auth_context, "_ac");
@@ -463,11 +591,13 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
       pserver = PyCObject_AsVoidPtr(tmp);
     }
 
+  assert(!check_obj(args));
+
   rc = krb5_rd_req(kctx, &ac_out, &inbuf, pserver, kt, &ap_req_options, &ticket);
   if(rc)
     return pk_error(rc);
 
-  retval = PyTuple_New(3);
+  retval = PyTuple_New(ticket->enc_part2?4:3);
   if(auth_context)
     {
       Py_INCREF(auth_context);
@@ -486,31 +616,43 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
       Py_DECREF(subargs);
       Py_XDECREF(mykw);
     }
+  assert(!check_obj(args));
+
   PyTuple_SetItem(retval, 0, auth_context);
   PyTuple_SetItem(retval, 1, PyInt_FromLong(ap_req_options));
-  {
-    PyObject *subargs, *otmp, *mykw = NULL;
-    krb5_principal princ;
+  if(!(tmp = make_principal(self, kctx, ticket->server)))
+    {
+      Py_DECREF(retval);
+      krb5_free_ticket(kctx, ticket);
+      return NULL;
+    }
+  
+  PyTuple_SetItem(retval, 2, tmp);
 
-    krb5_copy_principal(kctx, ticket->server, &princ);
-    otmp = PyCObject_FromVoidPtrAndDesc(princ, kctx, destroy_principal);
-    subargs = Py_BuildValue("(O)", otmp);
-    mykw = PyDict_New();
-    PyDict_SetItemString(kw, "context", self); /* Just pass existing keywords straight along */
-    tmp = PyEval_CallObjectWithKeywords(principal_class, subargs, mykw);
-    Py_DECREF(subargs);
-    Py_XDECREF(mykw);
-    Py_DECREF(otmp);
+  if(ticket->enc_part2)
+    {
+      PyObject *princtmp;
 
-    if(!tmp)
-      {
-	Py_DECREF(retval);
-	return NULL;
-      }
+      if(!(princtmp = make_principal(self, kctx, ticket->enc_part2->client)))
+	{
+	  Py_DECREF(retval);
+	  krb5_free_ticket(kctx, ticket);
+	  return NULL;
+	}
 
-    PyTuple_SetItem(retval, 2, tmp);
-  }
+      tmp = Py_BuildValue("(iOOOOOO)",
+			  ticket->enc_part2->flags,
+			  make_keyblock(ticket->enc_part2->session),
+			  princtmp,
+			  make_transited(&ticket->enc_part2->transited),
+			  make_ticket_times(&ticket->enc_part2->times),
+			  make_address_list(ticket->enc_part2->caddrs),
+			  make_authdata_list(ticket->enc_part2->authorization_data));
+      PyTuple_SetItem(retval, 3, tmp);
+    }
   krb5_free_ticket(kctx, ticket);
+
+  assert(!check_obj(args));
 
   return retval;
 }
@@ -1814,15 +1956,16 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
   krb5_flags options;
   krb5_error_code rc;
   krb5_creds in_creds, *out_creds = NULL;
+  int basepid = 0;
 
-  static const char *kwlist[]={"self", "in_creds", "options", NULL };
+  static const char *kwlist[]={"self", "in_creds", "options", "basepid", NULL };
 
-  memset(&in_creds, 0, sizeof(in_creds));
-  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO!|i:get_credentials", (char **)kwlist, &self,
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO!|ii:get_credentials", (char **)kwlist, &self,
 				  &PyTuple_Type, &subtmp,
-				  &options))
+				  &options, &basepid))
     return NULL;
 
+  memset(&in_creds, 0, sizeof(in_creds));
   if(!PyArg_ParseTuple(subtmp, "OO(iz#)(iiii)OOOz#z#O",
 		       &client, &server,
 		       &in_creds.keyblock.enctype, &in_creds.keyblock.contents, &in_creds.keyblock.length,
@@ -1836,7 +1979,6 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
     return NULL;
 
   tmp = PyObject_GetAttrString(client, "_princ");
-  if(!tmp) return NULL;
   if(!tmp) return NULL;
   in_creds.client = PyCObject_AsVoidPtr(tmp);
   tmp = PyObject_GetAttrString(server, "_princ");
@@ -1884,31 +2026,9 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
   else
     Py_INCREF(client);
 
-  if(out_creds->addresses)
-    {
-      int i, n;
-      for(n = 0; out_creds->addresses[n]; n++) /* */;
-      addrlist = PyTuple_New(n);
-      for(i = 0; i < n; i++)
-	PyTuple_SetItem(addrlist, i,
-			Py_BuildValue("(iz#)", out_creds->addresses[i]->addrtype, out_creds->addresses[i]->contents,
-				      out_creds->addresses[i]->length));
-    }
-  else
-    Py_INCREF(addrlist = Py_None);
+  addrlist = make_address_list(out_creds->addresses);
 
-  if(out_creds->authdata)
-    {
-      int i, n;
-      for(n = 0; out_creds->authdata[n]; n++) /* */;
-      adlist = PyTuple_New(n);
-      for(i = 0; i < n; i++)
-	PyTuple_SetItem(addrlist, i,
-			Py_BuildValue("(iz#)", out_creds->authdata[i]->ad_type, out_creds->authdata[i]->contents,
-				      out_creds->authdata[i]->length));
-    }
-  else
-    Py_INCREF(adlist = Py_None);
+  adlist = make_authdata_list(out_creds->authdata);
 
   retval = Py_BuildValue("(NN(iz#)(iiii)iiNz#z#N)", client, server, out_creds->keyblock.enctype,
 			 out_creds->keyblock.contents, out_creds->keyblock.length,
