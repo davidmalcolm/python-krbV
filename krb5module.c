@@ -259,7 +259,7 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
   krb5_error_code rc = 0;
   int free_ccacheo = 0;
   static const char *kwlist[] = {
-    "self", "server", "data", "options", "client", "ccache", "auth_context", "creds"
+    "self", "server", "data", "options", "client", "ccache", "auth_context", "creds", NULL
   };
 
   if(!PyArg_ParseTupleAndKeywords(args, kw, "O|O!SiO!O!O!O:mk_req", (char **)kwlist, &self,
@@ -1015,7 +1015,7 @@ AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
   krb5_context ctx;
   krb5_auth_context ac;
   krb5_error_code rc = 0;
-  static const char *kwlist[] = { "self", "context", "ac"};
+  static const char *kwlist[] = { "self", "context", "ac", NULL};
 
   if(!PyArg_ParseTupleAndKeywords(args, kw, "O|O!O!:__init__", (char **)kwlist, &self,
 				  context_class, &conobj, &PyCObject_Type, &acobj))
@@ -1058,7 +1058,7 @@ AuthContext_genaddrs(PyObject *notself, PyObject *args, PyObject *kw)
   krb5_auth_context ac;
   krb5_flags flags = 0;
   krb5_error_code rc;
-  static const char *kwlist[] = {"self", "fh", "flags"};
+  static const char *kwlist[] = {"self", "fh", "flags", NULL};
 
   if(!PyArg_ParseTupleAndKeywords(args, kw, "OO|i:genaddrs", (char **)kwlist, &self, &fh, &flags))
     return NULL;
@@ -1722,25 +1722,29 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 {
   krb5_context ctx = NULL;
   krb5_ccache ccache = NULL;
-  PyObject *retval, *self, *tmp, *conobj, *client, *server, *adlist, *addrlist;
+  PyObject *retval, *self, *tmp, *conobj, *client, *server, *adlist, *addrlist, *subtmp=NULL;
   krb5_flags options;
   krb5_error_code rc;
   krb5_creds in_creds, *out_creds = NULL;
 
-  static const char *kwlist[]={"self", "in_creds", "options" };
+  static const char *kwlist[]={"self", "in_creds", "options", NULL };
 
   memset(&in_creds, 0, sizeof(in_creds));
-  if(!PyArg_ParseTupleAndKeywords(args, kw, "O(O!O!(iz#)(iiii)OOOz#z#O)|i:get_credentials", (char **)kwlist, &self,
-				  principal_class, &client, principal_class, &server,
-				  &in_creds.keyblock.enctype, &in_creds.keyblock.contents, &in_creds.keyblock.length,
-				  &in_creds.times.authtime, &in_creds.times.starttime, &in_creds.times.endtime,
-				  &in_creds.times.renew_till, &tmp, &tmp, &tmp, &tmp,
-				  &in_creds.ticket.data,
-				  &in_creds.ticket.length,
-				  &in_creds.second_ticket.data,
-				  &in_creds.second_ticket.length,
-				  &tmp,
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO!|i:get_credentials", (char **)kwlist, &self,
+				  &PyTuple_Type, &subtmp,
 				  &options))
+    return NULL;
+
+  if(!PyArg_ParseTuple(subtmp, "O!O!(iz#)(iiii)OOOz#z#O",
+		       principal_class, &client, principal_class, &server,
+		       &in_creds.keyblock.enctype, &in_creds.keyblock.contents, &in_creds.keyblock.length,
+		       &in_creds.times.authtime, &in_creds.times.starttime, &in_creds.times.endtime,
+		       &in_creds.times.renew_till, &tmp, &tmp, &tmp, &tmp,
+		       &in_creds.ticket.data,
+		       &in_creds.ticket.length,
+		       &in_creds.second_ticket.data,
+		       &in_creds.second_ticket.length,
+		       &tmp))
     return NULL;
 
   tmp = PyObject_GetAttrString(client, "_princ");
