@@ -1239,12 +1239,11 @@ Principal_init(PyObject *notself, PyObject *args, PyObject *kw)
   krb5_principal princ;
   krb5_error_code rc = 0;
   char *name;
+  static const char *kwlist[] = {"self", "name", "context", NULL};
 
-  if(!PyArg_ParseTuple(args, "OO:__init__", &self, &princobj))
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO|O:__init__", (char **)kwlist, &self, &princobj, &conobj))
     return NULL;
 
-  if(kw && PyDict_Check(kw))
-    conobj = PyDict_GetItemString(kw, "context");
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
@@ -1259,12 +1258,10 @@ Principal_init(PyObject *notself, PyObject *args, PyObject *kw)
       rc = krb5_parse_name(ctx, name, &princ);
     }
   else if(PyObject_IsInstance(princobj, (PyObject *)&PyCObject_Type))
-    {
-      cobj = princobj;
-    }
+    cobj = princobj;
   else
     {
-      PyErr_Format(PyExc_TypeError, "Invalid type for argument 1");
+      PyErr_Format(PyExc_TypeError, "Invalid type %s for argument 1", princobj->ob_type->tp_name);
       return NULL;
     }
 
@@ -1570,17 +1567,20 @@ CCache_init(PyObject *notself, PyObject *args, PyObject *kw)
   krb5_ccache cc;
   krb5_error_code rc;
   int is_dfl = 0;
+  static const char *kwlist[] = {"self",  "name", "ccache", "primary_principal", "context", NULL};
 
-  if(!PyArg_ParseTuple(args, "O:__init__", &self))
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "O|SOOO:__init__", (char **)kwlist, &self, &new_cc_name, &new_cc, &primary_principal, &conobj))
     return NULL;
 
-  if(kw && PyDict_Check(kw))
-    {
-      conobj = PyDict_GetItemString(kw, "context");
-      new_cc_name = PyDict_GetItemString(kw, "name");
-      new_cc = PyDict_GetItemString(kw, "ccache");
-      primary_principal = PyDict_GetItemString(kw, "primary_principal");
-    }
+  if(conobj == Py_None)
+    conobj = NULL;
+  if(new_cc == Py_None)
+    new_cc = NULL;
+  if(new_cc_name == Py_None)
+    new_cc_name = NULL;
+  if(primary_principal == Py_None)
+    primary_principal = NULL;
+
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
@@ -1683,7 +1683,10 @@ CCache_principal(PyObject *unself, PyObject *args, PyObject *kw)
 
   retval = PyObject_GetAttrString(self, "_principal");
   if(retval)
-    return retval;
+    {
+      Py_INCREF(retval);
+      return retval;
+    }
 
   conobj = tmp = PyObject_GetAttrString(self, "context");
   if(tmp)
@@ -1717,6 +1720,61 @@ CCache_principal(PyObject *unself, PyObject *args, PyObject *kw)
   }
 
   return retval;
+}
+
+static PyObject*
+CCache_init_creds_keytab(PyObject *unself, PyObject *args, PyObject *kw)
+{
+  static const char *kwlist[] = {"self", "keytab", "principal", NULL};
+  PyObject *self, *keytab = NULL, *principal = NULL, *conobj = NULL, *tmp;
+  krb5_ccache ccache = NULL;
+  krb5_context ctx = NULL;
+  krb5_keytab kt = NULL;
+  krb5_principal princ = NULL;
+  krb5_error_code rc;
+  krb5_creds my_creds;
+  krb5_get_init_creds_opt options;
+
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO|O:init_creds_keytab", (char **)kwlist,
+				  &self, &keytab, &principal))
+    return NULL;
+
+  conobj = tmp = PyObject_GetAttrString(self, "context");
+  if(tmp)
+    {
+      tmp = PyObject_GetAttrString(tmp, "_ctx");
+      if(tmp)
+	ctx = PyCObject_AsVoidPtr(tmp);
+    }
+  tmp = PyObject_GetAttrString(self, "_ccache");
+  if(tmp)
+    ccache = PyCObject_AsVoidPtr(tmp);
+  tmp = PyObject_GetAttrString(keytab, "_keytab");
+  if(tmp)
+    kt = PyCObject_AsVoidPtr(tmp);
+  if(!principal)
+    {
+      tmp = Py_BuildValue("(O)", self);
+      principal = CCache_principal(NULL, tmp, NULL);
+      Py_DECREF(tmp);
+    }
+  tmp = PyObject_GetAttrString(principal, "_princ");
+  if(tmp)
+    princ = PyCObject_AsVoidPtr(tmp);
+  memset(&my_creds, 0, sizeof(my_creds));
+
+  rc = krb5_get_init_creds_keytab(ctx, &my_creds, princ, kt, 0, NULL, &options);
+  if(rc)
+    return pk_error(rc);
+
+  rc = krb5_cc_store_cred(ctx, ccache, &my_creds);
+  if(rc)
+    return pk_error(rc);
+
+  krb5_free_cred_contents(ctx, &my_creds);
+
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 static PyObject*
@@ -1835,6 +1893,7 @@ static PyMethodDef ccache_methods[] = {
   {"__eq__", (PyCFunction)CCache_eq, METH_VARARGS},
   {"principal", (PyCFunction)CCache_principal, METH_VARARGS},
   {"get_credentials", (PyCFunction)CCache_get_credentials, METH_VARARGS|METH_KEYWORDS},
+  {"init_creds_keytab", (PyCFunction)CCache_init_creds_keytab, METH_VARARGS|METH_KEYWORDS},
   {NULL, NULL}
 };
 
@@ -2203,21 +2262,17 @@ static PyObject*
 Keytab_init(PyObject *notself, PyObject *args, PyObject *kw)
 {
   PyObject *self;
-  PyObject *cobj, *conobj = NULL, *new_rc = NULL, *new_rc_name = NULL;
+  PyObject *cobj, *conobj = NULL, *new_rc = NULL;
+  char *ccname = NULL;
   krb5_context ctx;
   krb5_keytab keytab;
   krb5_error_code rc;
   int is_dfl = 0;
+  static const char *kwlist[] = {"self", "name", "keytab", "context", NULL};
 
-  if(!PyArg_ParseTuple(args, "O:__init__", &self))
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "O|zOO:__init__", (char **)kwlist, &self, &ccname, &new_rc, &conobj))
     return NULL;
 
-  if(kw && PyDict_Check(kw))
-    {
-      conobj = PyDict_GetItemString(kw, "context");
-      new_rc_name = PyDict_GetItemString(kw, "name");
-      new_rc = PyDict_GetItemString(kw, "keytab");
-    }
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
@@ -2230,10 +2285,8 @@ Keytab_init(PyObject *notself, PyObject *args, PyObject *kw)
       rc = 0;
       keytab = PyCObject_AsVoidPtr(new_rc);
     }
-  else if(new_rc_name)
+  else if(ccname)
     {
-      char *ccname = PyString_AsString(new_rc_name);
-      assert(ccname);
       rc = krb5_kt_resolve(ctx, ccname, &keytab);
     }
   else
