@@ -247,32 +247,28 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
   PyObject *ctx, *retval, *self, *in_data = NULL, *options = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *tmp,
-    *auth_context = NULL, *creds_second_ticket = NULL;
+    *auth_context = NULL, *credso = NULL;
   krb5_auth_context ac_out = NULL;
   krb5_data outbuf, inbuf;
-  krb5_creds creds, *credsp = NULL;
+  krb5_creds creds, *credsp = NULL, *credsptr;
   krb5_ccache ccache;
   krb5_principal pclient, pserver;
-  krb5_flags ap_req_options = 0, creds_options = 0;
+  krb5_flags ap_req_options = 0;
   int free_pclient = 0;
   krb5_error_code rc = 0;
   int free_ccacheo = 0;
   static const char *kwlist[] = {
-    "self", "server", "data", "options", "client", "ccache", "auth_context", "creds_options",
-    "creds_second_ticket"
+    "self", "server", "data", "options", "client", "ccache", "auth_context", "creds"
   };
 
-  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO!|SiO!O!O!iS:mk_req", (char **)kwlist, &self,
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "O|O!SiO!O!O!O:mk_req", (char **)kwlist, &self,
 				  principal_class, &server,
 				  &in_data, &ap_req_options,
 				  principal_class, &client,
 				  ccache_class, &ccacheo,
 				  auth_context_class, &auth_context,
-				  &creds_options,
-				  &creds_second_ticket))
+				  &creds))
     return NULL;
-
-  memset(&creds, 0, sizeof(creds));
 
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
@@ -290,31 +286,38 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
       inbuf.length = 5;
     }
 
-  if(creds_second_ticket)
+  if(credso)
     {
-      creds.second_ticket.data = PyString_AsString(creds_second_ticket);
-      creds.second_ticket.length = PyString_Size(creds_second_ticket);
-    }
+      credsptr = &creds;
 
-  if(!ccacheo)
-    {
-      PyObject *subargs;
-      subargs = Py_BuildValue("(O)", self);
-      ccacheo = Context_cc_default(unself, subargs, NULL);
-      Py_DECREF(subargs);
-      free_ccacheo = 1;
+      if(!PyArg_ParseTuple(credso, "O!O!(iz#)(iiii)OOOz#z#O",
+			   principal_class, &client, principal_class, &server,
+			   &creds.keyblock.enctype, &creds.keyblock.contents, &creds.keyblock.length,
+			   &creds.times.authtime, &creds.times.starttime, &creds.times.endtime,
+			   &creds.times.renew_till, &tmp, &tmp, &tmp, &tmp,
+			   &creds.ticket.data,
+			   &creds.ticket.length,
+			   &creds.second_ticket.data,
+			   &creds.second_ticket.length,
+			   &tmp))
+	return NULL;
     }
-  tmp = PyObject_GetAttrString(ccacheo, "_ccache");
-  ccache = PyCObject_AsVoidPtr(tmp);
-  if(free_ccacheo)
+  else
     {
-      Py_DECREF(ccacheo);
-    }
-
-  if(auth_context)
-    {
-      tmp = PyObject_GetAttrString(auth_context, "_ac");
-      ac_out = PyCObject_AsVoidPtr(tmp);
+      if(!ccacheo)
+	{
+	  PyObject *subargs;
+	  subargs = Py_BuildValue("(O)", self);
+	  ccacheo = Context_cc_default(unself, subargs, NULL);
+	  Py_DECREF(subargs);
+	  free_ccacheo = 1;
+	}
+      tmp = PyObject_GetAttrString(ccacheo, "_ccache");
+      ccache = PyCObject_AsVoidPtr(tmp);
+      if(free_ccacheo)
+	{
+	  Py_DECREF(ccacheo);
+	}
     }
 
   if(client)
@@ -337,21 +340,31 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
     }
   else
     {
-      PyErr_Format(PyExc_TypeError, "A server keyword argument is required");
+      PyErr_Format(PyExc_TypeError, "A server principal is required");
       return NULL;
     }
 
   creds.server = pserver;
   creds.client = pclient;
-  rc = krb5_get_credentials(kctx, creds_options, ccache, &creds, &credsp);
-  if(rc)
+  if(!credso)
     {
-      if(free_pclient)
-	krb5_free_principal(kctx, pclient);
-      return pk_error(rc);
+      rc = krb5_get_credentials(kctx, 0, ccache, &creds, &credsp);
+      if(rc)
+	{
+	  if(free_pclient)
+	    krb5_free_principal(kctx, pclient);
+	  return pk_error(rc);
+	}
+      credsptr = credsp;
     }
-  if(!rc)
-    rc = krb5_mk_req_extended(kctx, &ac_out, ap_req_options, &inbuf, credsp, &outbuf);
+
+  if(auth_context)
+    {
+      tmp = PyObject_GetAttrString(auth_context, "_ac");
+      ac_out = PyCObject_AsVoidPtr(tmp);
+    }
+
+  rc = krb5_mk_req_extended(kctx, &ac_out, ap_req_options, &inbuf, credsptr, &outbuf);
   if(credsp)
     krb5_free_creds(kctx, credsp);
   if(free_pclient)
@@ -394,9 +407,10 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
   krb5_auth_context ac_out = NULL;
   krb5_data inbuf;
   krb5_keytab kt;
-  krb5_principal pserver;
+  krb5_principal pserver = NULL;
   krb5_flags ap_req_options = 0;
   krb5_error_code rc = 0;
+  krb5_ticket *ticket = NULL;
   int free_keytab = 0;
 
   if(!PyArg_ParseTuple(args, "OO:rd_req", &self, &in_data))
@@ -423,7 +437,7 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
       inbuf.length = PyString_Size(in_data);
     }
 
-  if(!keytab)
+  if(keytab == Py_None)
     {
       PyObject *subargs;
       subargs = Py_BuildValue("(O)", self);
@@ -443,19 +457,14 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
       tmp = PyObject_GetAttrString(server, "_princ");
       pserver = PyCObject_AsVoidPtr(tmp);
     }
-  else
-    {
-      PyErr_Format(PyExc_TypeError, "A server keyword argument is required");
-      return NULL;
-    }
   if(options)
     ap_req_options = PyInt_AsLong(options);
 
-  rc = krb5_rd_req(kctx, &ac_out, &inbuf, pserver, kt, &ap_req_options, NULL);
+  rc = krb5_rd_req(kctx, &ac_out, &inbuf, pserver, kt, &ap_req_options, &ticket);
   if(rc)
     return pk_error(rc);
 
-  retval = PyTuple_New(2);
+  retval = PyTuple_New(3);
   {
     PyObject *subargs, *mykw = NULL, *otmp;
 
@@ -472,6 +481,10 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
   }
   tmp = PyInt_FromLong(ap_req_options);
   PyTuple_SetItem(retval, 1, tmp);
+  {
+    
+  }
+  krb5_free_ticket(ctx, ticket);
 
   return retval;
 }
