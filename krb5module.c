@@ -1763,6 +1763,7 @@ CCache_init_creds_keytab(PyObject *unself, PyObject *args, PyObject *kw)
     princ = PyCObject_AsVoidPtr(tmp);
   memset(&my_creds, 0, sizeof(my_creds));
 
+  memset(&options, 0, sizeof(options));
   rc = krb5_get_init_creds_keytab(ctx, &my_creds, princ, kt, 0, NULL, &options);
   if(rc)
     return pk_error(rc);
