@@ -716,7 +716,7 @@ Context_rd_rep(PyObject *unself, PyObject *args, PyObject *kw)
   krb5_error_code rc = 0;
   krb5_ap_rep_enc_part *repl = NULL;
 
-  if(!PyArg_ParseTuple(args, "OO!:mk_rep", &self, &PyString_Type, &in_data))
+  if(!PyArg_ParseTuple(args, "OO!:rd_rep", &self, &PyString_Type, &in_data))
     return NULL;
 
   ctx = PyObject_GetAttrString(self, "_ctx");
