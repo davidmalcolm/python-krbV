@@ -34,7 +34,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %doc README
-/usr/lib/python%{pyver}/site-packages/krbVmodule.so
+%{_libdir}/python%{pyver}/site-packages/krbVmodule.so
 
 %changelog
 * Tue Sep 25 2001 Elliot Lee <sopwith@redhat.com>
