@@ -15,7 +15,7 @@ krb5_error_code krb5_free_krbhst KRB5_PROTOTYPE((krb5_context, char * const *));
 
 static PyObject *pk_default_context(PyObject *self, PyObject *unused_args);
 
-static PyObject *krb5_module, *context_class, *auth_context_class, *principal_class, *ccache_class, *rcache_class;
+static PyObject *krb5_module, *context_class, *auth_context_class, *principal_class, *ccache_class, *rcache_class, *keytab_class;
 
 static PyObject*
 Context_init(PyObject *notself, PyObject *args)
@@ -188,10 +188,47 @@ Context_rc_default(PyObject *unself, PyObject *args, PyObject *kw)
 
   return retval;
 }
+
+static PyObject*
+Context_kt_default(PyObject *unself, PyObject *args, PyObject *kw)
+{
+  krb5_context kctx = NULL;
+  PyObject *ctx, *retval, *self;
+
+  if(!PyArg_ParseTuple(args, "O:default_keytab", &self))
+    return NULL;
+
+  retval = PyObject_GetAttrString(self, "_default_kt");
+  if(retval)
+    return retval;
+
+  ctx = PyObject_GetAttrString(self, "_ctx");
+  kctx = PyCObject_AsVoidPtr(ctx);
+
+  {
+    PyObject *args, *mykw = NULL;
+
+    args = Py_BuildValue("()");
+    if(!kw)
+      {
+	mykw = kw = PyDict_New();
+      }
+    PyDict_SetItemString(kw, "context", self); /* Just pass existing keywords straight along, mostly */
+    retval = PyEval_CallObjectWithKeywords(keytab_class, args, kw);
+    Py_DECREF(args);
+    Py_XDECREF(mykw);
+    if(retval)
+      PyObject_SetAttrString(self, "_default_kt", retval);
+  }
+
+  return retval;
+}
+
 static PyMethodDef context_methods[] = {
   {"__init__", Context_init, METH_VARARGS|METH_KEYWORDS},
   {"default_ccache", (PyCFunction)Context_cc_default, METH_VARARGS|METH_KEYWORDS},
   {"default_rcache", (PyCFunction)Context_rc_default, METH_VARARGS|METH_KEYWORDS},
+  {"default_keytab", (PyCFunction)Context_kt_default, METH_VARARGS|METH_KEYWORDS},
   {NULL, NULL}
 };
 
@@ -350,6 +387,17 @@ AuthContext_setattr(PyObject *unself, PyObject *args)
       if(rc)
 	return pk_error(rc);
     }
+  else if(!strcmp(name, "rcache"))
+    {
+      krb5_rcache rcache;
+
+      tmp = PyObject_GetAttrString(value, "_rcache");
+      assert(tmp);
+      rcache = PyCObject_AsVoidPtr(tmp);
+      rc = krb5_auth_con_setrcache(ctx, ac, rcache);
+      if(rc)
+	return pk_error(rc);
+    }
   else if(!strcmp(name, "addrs")
 	  || (!strcmp(name, "context") && ctx)
 	  || (!strcmp(name, "_ac") && ac)
@@ -375,16 +423,19 @@ static PyObject*
 AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
 {
   PyObject *self;
-  PyObject *cobj, *conobj;
+  PyObject *cobj, *conobj, *acobj;
   krb5_context ctx;
   krb5_auth_context ac;
-  krb5_error_code rc;
+  krb5_error_code rc = 0;
 
   if(!PyArg_ParseTuple(args, "O:__init__", &self))
     return NULL;
 
   if(PyDict_Check(kw))
-    conobj = PyDict_GetItemString(kw, "context");
+    {
+      conobj = PyDict_GetItemString(kw, "context");
+      acobj = PyDict_GetItemString(kw, "ac");
+    }
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
@@ -392,7 +443,10 @@ AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
   assert(cobj);
   ctx = PyCObject_AsVoidPtr(cobj);
 
-  rc = krb5_auth_con_init(ctx, &ac);
+  if(acobj)
+    ac = PyCObject_AsVoidPtr(acobj);
+  else
+    rc = krb5_auth_con_init(ctx, &ac);
   if(rc)
     {
       pk_error(rc);
@@ -993,7 +1047,7 @@ RCache_getattr(PyObject *unself, PyObject *args)
 	  if(tmp)
 	    ctx = PyCObject_AsVoidPtr(tmp);
 	}
-      tmp = PyObject_GetAttrString(self, "_rccache");
+      tmp = PyObject_GetAttrString(self, "_rcache");
       if(tmp)
 	rcache = PyCObject_AsVoidPtr(tmp);
     }
@@ -1012,7 +1066,6 @@ RCache_getattr(PyObject *unself, PyObject *args)
 
       nom = krb5_rc_get_type(ctx, rcache);
       retval = PyString_FromString(nom);
-      free(nom);
     }
   else
     {
@@ -1129,6 +1182,10 @@ RCache_init(PyObject *notself, PyObject *args, PyObject *kw)
       cobj = PyCObject_FromVoidPtrAndDesc(rcache, ctx, destroy_rcache);
       PyObject_SetAttrString(self, "_rcache", cobj);
       PyObject_SetAttrString(self, "context", conobj);
+      if(do_recover)
+	rc = krb5_rc_recover(ctx, rcache);
+      if(rc || !do_recover)
+	krb5_rc_initialize(ctx, rcache, 24000);
     }
 
   Py_INCREF(Py_None);
@@ -1192,6 +1249,231 @@ pk_rcache_make_class(PyObject *module)
 
   PyObject_SetAttrString(retval, "__module__", module);
   for(def = rcache_methods; def->ml_name; def++)
+    {
+      PyObject *func = PyCFunction_New(def, NULL);
+      PyObject *method = PyMethod_New(func, NULL, retval);
+      PyDict_SetItemString(dict, def->ml_name, method);
+      Py_DECREF(func);
+      Py_DECREF(method);
+    }
+  klass->cl_getattr = PyMethod_New(PyCFunction_New(&getattr, NULL), NULL, retval);
+  klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
+
+  return retval;
+}
+
+/************************* keytab **********************************/
+static PyObject*
+Keytab_getattr(PyObject *unself, PyObject *args)
+{
+  char *name;
+  PyObject *retval = NULL, *self, *tmp;
+  krb5_context ctx = NULL;
+  krb5_keytab keytab = NULL;
+  krb5_error_code rc;
+
+  if(!PyArg_ParseTuple(args, "Os:__getattr__", &self, &name))
+    return NULL;
+
+  if(strcmp(name, "context") && strcmp(name, "_keytab"))
+    {
+      tmp = PyObject_GetAttrString(self, "context");
+      if(tmp)
+	{
+	  tmp = PyObject_GetAttrString(tmp, "_ctx");
+	  if(tmp)
+	    ctx = PyCObject_AsVoidPtr(tmp);
+	}
+      tmp = PyObject_GetAttrString(self, "_keytab");
+      if(tmp)
+	keytab = PyCObject_AsVoidPtr(tmp);
+    }
+
+  if(!strcmp(name, "name"))
+    {
+      char nombuf[64];
+
+      rc = krb5_kt_get_name(ctx, keytab, nombuf, sizeof(nombuf));
+      if(rc)
+	return pk_error(rc);
+      retval = PyString_FromString(nombuf);
+    }
+  else
+    {
+      PyErr_Format(PyExc_AttributeError, "%.50s instance has no attribute '%.400s'",
+		   PyString_AS_STRING(((PyInstanceObject *)self)->in_class->cl_name), name);
+      retval = NULL;
+    }
+
+  return retval;
+}
+
+static PyObject*
+Keytab_setattr(PyObject *unself, PyObject *args)
+{
+  char *name;
+  PyObject *self, *value, *nameo, *tmp;
+  PyInstanceObject *inst;
+  krb5_context ctx = NULL;
+  krb5_keytab keytab = NULL;
+
+  if(!PyArg_ParseTuple(args, "OO!O:__setattr__", &self, &PyString_Type, &nameo, &value))
+    return NULL;
+  inst = (PyInstanceObject *)self;
+
+  name = PyString_AsString(nameo);
+
+  if(strcmp(name, "context") && strcmp(name, "_keytab"))
+    {
+      tmp = PyObject_GetAttrString(self, "context");
+      if(tmp)
+	{
+	  tmp = PyObject_GetAttrString(tmp, "_ctx");
+	  if(tmp)
+	    ctx = PyCObject_AsVoidPtr(tmp);
+	}
+      tmp = PyObject_GetAttrString(self, "_keytab");
+      if(tmp)
+	keytab = PyCObject_AsVoidPtr(tmp);
+    }
+
+  if((!strcmp(name, "context") && ctx)
+     || (!strcmp(name, "_keytab") && keytab)
+     || !strcmp(name, "name")
+     )
+    {
+      PyErr_Format(PyExc_AttributeError, "You cannot set attribute '%.400s'", name);
+      return NULL;
+    }
+  else
+    PyDict_SetItem(inst->in_dict, nameo, value);
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+static void
+destroy_keytab(void *cobj, void *desc)
+{
+  krb5_kt_close((krb5_context)desc, (krb5_keytab)cobj);
+}
+
+static PyObject*
+Keytab_init(PyObject *notself, PyObject *args, PyObject *kw)
+{
+  PyObject *self;
+  PyObject *cobj, *conobj = NULL, *new_rc = NULL, *new_rc_name = NULL;
+  krb5_context ctx;
+  krb5_keytab keytab;
+  krb5_error_code rc;
+  int is_dfl = 0;
+
+  if(!PyArg_ParseTuple(args, "O:__init__", &self))
+    return NULL;
+
+  if(PyDict_Check(kw))
+    {
+      conobj = PyDict_GetItemString(kw, "context");
+      new_rc_name = PyDict_GetItemString(kw, "name");
+      new_rc = PyDict_GetItemString(kw, "keytab");
+    }
+  if(!conobj)
+    conobj = pk_default_context(NULL, NULL);
+  assert(conobj);
+  cobj = PyObject_GetAttrString(conobj, "_ctx");
+  assert(cobj);
+  ctx = PyCObject_AsVoidPtr(cobj);
+
+  if(new_rc)
+    {
+      rc = 0;
+      keytab = PyCObject_AsVoidPtr(new_rc);
+    }
+  else if(new_rc_name)
+    {
+      char *ccname = PyString_AsString(new_rc_name);
+      assert(ccname);
+      rc = krb5_kt_resolve(ctx, ccname, &keytab);
+    }
+  else
+    {
+      rc = krb5_kt_default(ctx, &keytab);
+      is_dfl = 1;
+    }
+
+  if(rc)
+    {
+      pk_error(rc);
+      return NULL;
+    }
+  else
+    {
+      cobj = PyCObject_FromVoidPtrAndDesc(keytab, ctx, destroy_keytab);
+      PyObject_SetAttrString(self, "_keytab", cobj);
+      PyObject_SetAttrString(self, "context", conobj);
+    }
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+static PyObject*
+Keytab_eq(PyObject *unself, PyObject *args)
+{
+  PyObject *self, *tmp, *other;
+  krb5_context ctx = NULL;
+  krb5_keytab princ = NULL, otherprinc = NULL;
+
+  if(!PyArg_ParseTuple(args, "OO:__eq__", &self, &other))
+    return NULL;
+  if(!PyObject_IsInstance(other, (PyObject *)((PyInstanceObject *)self)->in_class))
+    {
+      PyErr_Format(PyExc_TypeError, "Second argument must be a Keytab");
+      return NULL;
+    }
+
+  tmp = PyObject_GetAttrString(self, "context");
+  if(tmp)
+    {
+      tmp = PyObject_GetAttrString(tmp, "_ctx");
+      if(tmp)
+	ctx = PyCObject_AsVoidPtr(tmp);
+    }
+  tmp = PyObject_GetAttrString(self, "_keytab");
+  princ = PyCObject_AsVoidPtr(tmp);
+  tmp = PyObject_GetAttrString(other, "_keytab");
+  otherprinc = PyCObject_AsVoidPtr(tmp);
+
+  if(princ == otherprinc)
+    return PyInt_FromLong(1);
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+static PyMethodDef keytab_methods[] = {
+  {"__init__", (PyCFunction)Keytab_init, METH_VARARGS|METH_KEYWORDS},
+  {"__eq__", (PyCFunction)Keytab_eq, METH_VARARGS},
+  {NULL, NULL}
+};
+
+static PyObject *
+pk_keytab_make_class(PyObject *module)
+{
+  PyMethodDef *def;
+  static PyMethodDef getattr = {"__getattr__", Keytab_getattr, METH_VARARGS},
+    setattr = {"__setattr__", Keytab_setattr, METH_VARARGS};
+  PyObject *dict, *name, *retval;
+  PyClassObject *klass;
+
+  dict = PyDict_New();
+  name = PyString_FromString("Keytab");
+
+  retval = PyClass_New(NULL, dict, name);
+  klass = (PyClassObject *)retval;
+
+  PyObject_SetAttrString(retval, "__module__", module);
+  for(def = keytab_methods; def->ml_name; def++)
     {
       PyObject *func = PyCFunction_New(def, NULL);
       PyObject *method = PyMethod_New(func, NULL, retval);
@@ -1277,6 +1559,10 @@ initkrb5(void)
   rcache_class = pk_rcache_make_class(modname);
   PyDict_SetItemString(dict, "RCache", rcache_class);
   Py_DECREF(rcache_class);
+
+  keytab_class = pk_keytab_make_class(modname);
+  PyDict_SetItemString(dict, "Keytab", keytab_class);
+  Py_DECREF(keytab_class);
 
   Py_DECREF(modname);
 
