@@ -10,6 +10,9 @@ AC_PROG_LIBTOOL
 AM_PATH_PYTHON_JH(2.1)
 AM_CHECK_PYTHON_HEADERS(, AC_MSG_ERROR([you need to have the python development headers installed]))
 
+test -z "$LIBNAME" && LIBNAME=lib
+AC_SUBST(LIBNAME)
+
 krb5_prefix=
 for I in /usr /usr/kerberos /usr/athena; do
 	if test -f ${I}/include/krb5.h; then
@@ -19,7 +22,7 @@ for I in /usr /usr/kerberos /usr/athena; do
 done
 if test -n "$krb5_prefix"; then
 	KRB5_HEADERDIR=${krb5_prefix}/include
-	KRB5_LIBS="-L${krb5_prefix}/lib -lkrb5"
+	KRB5_LIBS="-L${krb5_prefix}/$LIBNAME -lkrb5"
 	AC_SUBST(KRB5_HEADERDIR)
 	AC_SUBST(KRB5_LIBS)
 else

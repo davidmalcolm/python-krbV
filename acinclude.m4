@@ -33,7 +33,7 @@ AC_DEFUN([AM_PATH_PYTHON_JH],
   AC_PROVIDE([AM_PATH_PYTHON_JH])
   dnl Find a version of Python.  I could check for python versions 1.4
   dnl or earlier, but the default installation locations changed from
-  dnl $prefix/lib/site-python in 1.4 to $prefix/lib/python1.5/site-packages
+  dnl $prefix/$LIBNAME/site-python in 1.4 to $prefix/$LIBNAME/python1.5/site-packages
   dnl in 1.5, and I don't want to maintain that logic.
 
   dnl should we do the version check?
@@ -117,7 +117,7 @@ else:
   dnl then the old $(pythondir) was pretty useless.
 
   AC_SUBST(pythondir)
-  pythondir=$PYTHON_PREFIX"/lib/python"$PYTHON_VERSION/site-packages
+  pythondir=$PYTHON_PREFIX"/$LIBNAME/python"$PYTHON_VERSION/site-packages
 
   dnl pkgpythondir -- $PACKAGE directory under pythondir.  Was
   dnl   PYTHON_SITE_PACKAGE in previous betas, but this naming is
@@ -131,7 +131,7 @@ else:
   dnl   (shared libraries)  Was PYTHON_SITE_EXEC in previous betas.
 
   AC_SUBST(pyexecdir)
-  pyexecdir=$PYTHON_EXEC_PREFIX"/lib/python"$PYTHON_VERSION/site-packages
+  pyexecdir=$PYTHON_EXEC_PREFIX"/$LIBNAME/python"$PYTHON_VERSION/site-packages
 
   dnl pkgpyexecdir -- $(pyexecdir)/$(PACKAGE)
   dnl   Maybe this should be put in python.am?

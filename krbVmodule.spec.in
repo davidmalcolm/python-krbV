@@ -21,12 +21,13 @@ Allows python programs to use Kerberos 5 authentication/security.
 %setup -q -n krbVmodule-%{version}
 
 %build
+export LIBNAME=%{_lib}
 %configure
 make %{?_smp_mflags}
 
 %install
 rm -rf $RPM_BUILD_ROOT
-mkdir -p $RPM_BUILD_ROOT/usr/lib/python%{pyver}/site-packages
+mkdir -p $RPM_BUILD_ROOT/%{_libdir}/python%{pyver}/site-packages
 %makeinstall
 
 %clean
