@@ -1952,11 +1952,12 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 {
   krb5_context ctx = NULL;
   krb5_ccache ccache = NULL;
-  PyObject *retval, *self, *tmp, *conobj, *client, *server, *adlist, *addrlist, *subtmp=NULL;
+  PyObject *retval, *self, *tmp, *conobj, *client, *server, *adlist, *addrlist, *subtmp=NULL, *authdata_tmp=NULL;
   krb5_flags options;
   krb5_error_code rc;
   krb5_creds in_creds, *out_creds = NULL;
   int basepid = 0;
+  krb5_authdata *adata, **adata_ptrs = NULL;
 
   static const char *kwlist[]={"self", "in_creds", "options", "basepid", NULL };
 
@@ -1975,8 +1976,60 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 		       &in_creds.ticket.length,
 		       &in_creds.second_ticket.data,
 		       &in_creds.second_ticket.length,
-		       &tmp))
+		       &authdata_tmp))
     return NULL;
+
+  if(authdata_tmp && authdata_tmp != Py_None)
+    {
+      if(PyString_Check(authdata_tmp))
+	{
+	  adata = alloca(sizeof(krb5_authdata));
+	  memset(adata, 0, sizeof(krb5_authdata));
+	  adata_ptrs = alloca(sizeof(krb5_authdata *) * 2);
+	  adata_ptrs[0] = &adata[0];
+	  adata_ptrs[1] = NULL;
+	  adata[0].length = PyString_GET_SIZE(authdata_tmp);
+	  adata[0].contents = PyString_AS_STRING(authdata_tmp);
+	}
+      else  if(PySequence_Check(authdata_tmp))
+	{
+	  int i, n;
+
+	  n = PySequence_Length(authdata_tmp);
+	  adata = alloca(sizeof(krb5_authdata) * n);
+	  memset(adata, 0, sizeof(krb5_authdata) * n);
+	  adata_ptrs = alloca(sizeof(krb5_authdata *) * (n+1));
+	  for(i = 0; i < n; i++)
+	    {
+	      PyObject *otmp = PySequence_GetItem(authdata_tmp, i);
+	      if(PySequence_Check(otmp))
+		{
+		  if(!PyArg_ParseTuple(otmp, "z#i", &adata[i].contents, &adata[i].length, &adata[i].ad_type))
+		    return NULL;
+		}
+	      else if(PyString_Check(otmp))
+		{
+		  adata[i].length = PyString_GET_SIZE(otmp);
+		  adata[i].contents = PyString_AS_STRING(otmp);
+		}
+	      else
+		{
+		  PyErr_Format(PyExc_TypeError, "authdata must be a sequence or string");
+		  return NULL;
+		}
+
+	      adata_ptrs[i] = &adata[i];
+	    }
+	  adata_ptrs[i] = NULL;
+	}
+      else
+	{
+	  PyErr_Format(PyExc_TypeError, "authdata must be a sequence");
+	  return NULL;
+	}
+
+      in_creds.authdata = adata_ptrs;
+    }
 
   tmp = PyObject_GetAttrString(client, "_princ");
   if(!tmp) return NULL;
