@@ -146,6 +146,7 @@ Context_cc_default(PyObject *unself, PyObject *args, PyObject *kw)
   retval = PyObject_GetAttrString(self, "_default_cc");
   if(retval)
     return retval;
+  PyErr_Clear();
 
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
@@ -179,6 +180,8 @@ Context_rc_default(PyObject *unself, PyObject *args, PyObject *kw)
   retval = PyObject_GetAttrString(self, "_default_rc");
   if(retval)
     return retval;
+
+  PyErr_Clear();
 
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
@@ -215,6 +218,8 @@ Context_kt_default(PyObject *unself, PyObject *args, PyObject *kw)
   if(retval)
     return retval;
 
+  PyErr_Clear();
+
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
 
@@ -241,39 +246,41 @@ static PyObject*
 Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
-  PyObject *ctx, *retval, *self, *in_data = NULL, *options = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *tmp;
+  PyObject *ctx, *retval, *self, *in_data = NULL, *options = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *tmp,
+    *auth_context = NULL, *creds_second_ticket = NULL;
   krb5_auth_context ac_out = NULL;
   krb5_data outbuf, inbuf;
   krb5_creds creds, *credsp = NULL;
   krb5_ccache ccache;
   krb5_principal pclient, pserver;
-  krb5_flags ap_req_options = 0;
+  krb5_flags ap_req_options = 0, creds_options = 0;
   int free_pclient = 0;
   krb5_error_code rc = 0;
   int free_ccacheo = 0;
+  static const char *kwlist[] = {
+    "self", "server", "data", "options", "client", "ccache", "auth_context", "creds_options",
+    "creds_second_ticket"
+  };
 
-  if(!PyArg_ParseTuple(args, "O:mk_req", &self))
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO!|SiO!O!O!iS:mk_req", (char **)kwlist, &self,
+				  principal_class, &server,
+				  &in_data, &ap_req_options,
+				  principal_class, &client,
+				  ccache_class, &ccacheo,
+				  auth_context_class, &auth_context,
+				  &creds_options,
+				  &creds_second_ticket))
     return NULL;
+
+  memset(&creds, 0, sizeof(creds));
 
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
 
-  if(kw)
-    {
-      in_data = PyDict_GetItemString(kw, "data");
-      options = PyDict_GetItemString(kw, "options");
-      server = PyDict_GetItemString(kw, "server");
-      client = PyDict_GetItemString(kw, "client");
-      ccacheo = PyDict_GetItemString(kw, "ccache");
-    }
+  if(options)
+    ap_req_options = PyInt_AsLong(options);
   if(in_data)
     {
-      if(!PyString_Check(in_data))
-	{
-	  PyErr_Format(PyExc_TypeError, "data must be a string type");
-	  return NULL;
-	}
-	  
       inbuf.data = PyString_AsString(in_data);
       inbuf.length = PyString_Size(in_data);
     }
@@ -282,6 +289,13 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
       inbuf.data = "BLANK";
       inbuf.length = 5;
     }
+
+  if(creds_second_ticket)
+    {
+      creds.second_ticket.data = PyString_AsString(creds_second_ticket);
+      creds.second_ticket.length = PyString_Size(creds_second_ticket);
+    }
+
   if(!ccacheo)
     {
       PyObject *subargs;
@@ -295,6 +309,12 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
   if(free_ccacheo)
     {
       Py_DECREF(ccacheo);
+    }
+
+  if(auth_context)
+    {
+      tmp = PyObject_GetAttrString(auth_context, "_ac");
+      ac_out = PyCObject_AsVoidPtr(tmp);
     }
 
   if(client)
@@ -320,13 +340,10 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
       PyErr_Format(PyExc_TypeError, "A server keyword argument is required");
       return NULL;
     }
-  if(options)
-    ap_req_options = PyInt_AsLong(options);
 
-  memset(&creds, 0, sizeof(creds));
   creds.server = pserver;
   creds.client = pclient;
-  rc = krb5_get_credentials(kctx, 0, ccache, &creds, &credsp);
+  rc = krb5_get_credentials(kctx, creds_options, ccache, &creds, &credsp);
   if(rc)
     {
       if(free_pclient)
@@ -343,20 +360,25 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
     return pk_error(rc);
 
   retval = PyTuple_New(2);
-  {
-    PyObject *subargs, *mykw = NULL, *otmp;
+  if(auth_context)
+    {
+      Py_INCREF(auth_context);
+    }
+  else
+    {
+      PyObject *subargs, *mykw = NULL, *otmp;
 
-    subargs = Py_BuildValue("()");
-    mykw = PyDict_New();
-    PyDict_SetItemString(mykw, "context", self);
-    otmp = PyCObject_FromVoidPtrAndDesc(ac_out, kctx, destroy_ac);
-    PyDict_SetItemString(mykw, "ac", otmp);
-    tmp = PyEval_CallObjectWithKeywords(auth_context_class, subargs, mykw);
-    Py_DECREF(otmp);
-    Py_DECREF(subargs);
-    Py_XDECREF(mykw);
-    PyTuple_SetItem(retval, 0, tmp);
-  }
+      subargs = Py_BuildValue("()");
+      mykw = PyDict_New();
+      PyDict_SetItemString(mykw, "context", self);
+      otmp = PyCObject_FromVoidPtrAndDesc(ac_out, kctx, destroy_ac);
+      PyDict_SetItemString(mykw, "ac", otmp);
+      auth_context = PyEval_CallObjectWithKeywords(auth_context_class, subargs, mykw);
+      Py_DECREF(otmp);
+      Py_DECREF(subargs);
+      Py_XDECREF(mykw);
+    }
+  PyTuple_SetItem(retval, 0, auth_context);
   tmp = PyString_FromStringAndSize(outbuf.data, outbuf.length);
   PyTuple_SetItem(retval, 1, tmp);
   krb5_free_data_contents(kctx, &outbuf);
@@ -454,6 +476,20 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
   return retval;
 }
 
+static int
+obj_to_fd(PyObject *fd_obj)
+{
+  if(PyInt_Check(fd_obj))
+    return PyInt_AsLong(fd_obj);
+  else if(PyLong_Check(fd_obj))
+    return PyLong_AsLongLong(fd_obj);
+
+  fd_obj = PyEval_CallMethod(fd_obj, "fileno", "()");
+  if(!fd_obj)
+    return -1;
+  return PyInt_AsLong(fd_obj);
+}
+
 static PyObject*
 Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
 {
@@ -474,17 +510,9 @@ Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
   if(!PyArg_ParseTuple(args, "OOs:sendauth", &self, &fd_obj, &appl_version))
     return NULL;
 
-  if(PyInt_Check(fd_obj))
-    fd = PyInt_AsLong(fd_obj);
-  else if(PyLong_Check(fd_obj))
-    fd = PyLong_AsLongLong(fd_obj);
-  else
-    {
-      fd_obj = PyEval_CallMethod(fd_obj, "fileno", "()");
-      if(!fd_obj)
-	return NULL;
-      fd = PyInt_AsLong(fd_obj);
-    }
+  fd = obj_to_fd(fd_obj);
+  if(fd < 0)
+    return NULL;
   
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
@@ -598,17 +626,9 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
   if(!PyArg_ParseTuple(args, "OOs:recvauth", &self, &fd_obj, &appl_version))
     return NULL;
 
-  if(PyInt_Check(fd_obj))
-    fd = PyInt_AsLong(fd_obj);
-  else if(PyLong_Check(fd_obj))
-    fd = PyLong_AsLongLong(fd_obj);
-  else
-    {
-      fd_obj = PyEval_CallMethod(fd_obj, "fileno", "()");
-      if(!fd_obj)
-	return NULL;
-      fd = PyInt_AsLong(fd_obj);
-    }
+  fd = obj_to_fd(fd_obj);
+  if(fd < 0)
+    return NULL;
 
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
@@ -814,6 +834,8 @@ AuthContext_getattr(PyObject *unself, PyObject *args)
 	ac = PyCObject_AsVoidPtr(tmp);
     }
 
+  PyErr_Clear();
+  
   if(!strcmp(name, "flags"))
     {
       krb5_int32 flags;
@@ -897,6 +919,8 @@ AuthContext_setattr(PyObject *unself, PyObject *args)
 	ac = PyCObject_AsVoidPtr(tmp);
     }
 
+  PyErr_Clear();
+  
   if(!strcmp(name, "flags"))
     {
       krb5_int32 flags;
@@ -906,7 +930,7 @@ AuthContext_setattr(PyObject *unself, PyObject *args)
 	flags = PyLong_AsLongLong(value);
       else
 	{
-	  PyErr_Format(PyExc_TypeError, "argument 2 must be a string");
+	  PyErr_Format(PyExc_TypeError, "flags must be an integer");
 	  return NULL;
 	}
       rc = krb5_auth_con_setflags(ctx, ac, flags);
@@ -921,6 +945,17 @@ AuthContext_setattr(PyObject *unself, PyObject *args)
       assert(tmp);
       rcache = PyCObject_AsVoidPtr(tmp);
       rc = krb5_auth_con_setrcache(ctx, ac, rcache);
+      if(rc)
+	return pk_error(rc);
+    }
+  else if(!strcmp(name, "useruserkey"))
+    {
+      krb5_keyblock kb;
+
+      memset(&kb, 0, sizeof(kb));
+      if(!PyArg_ParseTuple(value, "iz#", &kb.enctype, &kb.contents, &kb.length))
+	return NULL;
+      rc = krb5_auth_con_setuseruserkey(ctx, ac, &kb);
       if(rc)
 	return pk_error(rc);
     }
@@ -949,19 +984,16 @@ static PyObject*
 AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
 {
   PyObject *self;
-  PyObject *cobj, *conobj, *acobj;
+  PyObject *cobj, *conobj = NULL, *acobj = NULL;
   krb5_context ctx;
   krb5_auth_context ac;
   krb5_error_code rc = 0;
+  static const char *kwlist[] = { "self", "context", "ac"};
 
-  if(!PyArg_ParseTuple(args, "O:__init__", &self))
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "O|O!O!:__init__", (char **)kwlist, &self,
+				  context_class, &conobj, &PyCObject_Type, &acobj))
     return NULL;
 
-  if(kw && PyDict_Check(kw))
-    {
-      conobj = PyDict_GetItemString(kw, "context");
-      acobj = PyDict_GetItemString(kw, "ac");
-    }
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
@@ -972,10 +1004,7 @@ AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
   if(!acobj)
     rc = krb5_auth_con_init(ctx, &ac);
   if(rc)
-    {
-      pk_error(rc);
-      return NULL;
-    }
+    return pk_error(rc);
   else
     {
       if(acobj)
@@ -993,8 +1022,41 @@ AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
   return Py_None;
 }
 
+static PyObject*
+AuthContext_genaddrs(PyObject *notself, PyObject *args, PyObject *kw)
+{
+  PyObject *self, *fh, *tmp;
+  int fd;
+  krb5_context ctx;
+  krb5_auth_context ac;
+  krb5_flags flags = 0;
+  krb5_error_code rc;
+  static const char *kwlist[] = {"self", "fh", "flags"};
+
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO|i:genaddrs", (char **)kwlist, &self, &fh, &flags))
+    return NULL;
+
+  tmp = PyObject_GetAttrString(self, "context");
+  tmp = PyObject_GetAttrString(tmp, "_ctx");
+  ctx = PyCObject_AsVoidPtr(tmp);
+  tmp = PyObject_GetAttrString(self, "_ac");
+  ac = PyCObject_AsVoidPtr(tmp);
+  
+  fd = obj_to_fd(fh);
+  if(fd < 0)
+    return NULL;
+
+  rc = krb5_auth_con_genaddrs(ctx, ac, fd, flags);
+  if(rc)
+    return pk_error(rc);
+  
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
 static PyMethodDef auth_context_methods[] = {
   {"__init__", (PyCFunction)AuthContext_init, METH_VARARGS|METH_KEYWORDS},
+  {"genaddrs", (PyCFunction)AuthContext_genaddrs, METH_VARARGS|METH_KEYWORDS},
   {NULL, NULL}
 };
 
@@ -1022,6 +1084,7 @@ pk_auth_context_make_class(PyObject *module)
       Py_DECREF(func);
       Py_DECREF(method);
     }
+
   klass->cl_getattr = PyMethod_New(PyCFunction_New(&getattr, NULL), NULL, retval);
   klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
 
@@ -1054,6 +1117,8 @@ Principal_getattr(PyObject *unself, PyObject *args)
       if(tmp)
 	princ = PyCObject_AsVoidPtr(tmp);
     }
+
+  PyErr_Clear();
 
   if(!strcmp(name, "realm"))
     {
@@ -1112,6 +1177,8 @@ Principal_setattr(PyObject *unself, PyObject *args)
 	princ = PyCObject_AsVoidPtr(tmp);
     }
 
+  PyErr_Clear();
+  
   if((!strcmp(name, "context") && ctx)
      || (!strcmp(name, "_princ") && princ)
      || !strcmp(name, "realm")
@@ -1573,7 +1640,6 @@ CCache_eq(PyObject *unself, PyObject *args)
   return Py_None;
 }
 
-
 static PyObject*
 CCache_principal(PyObject *unself, PyObject *args, PyObject *kw)
 {
@@ -1624,10 +1690,112 @@ CCache_principal(PyObject *unself, PyObject *args, PyObject *kw)
   return retval;
 }
 
+static PyObject*
+CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
+{
+  krb5_context ctx = NULL;
+  krb5_ccache ccache = NULL;
+  PyObject *retval, *self, *tmp, *conobj, *client, *server, *adlist, *addrlist;
+  krb5_flags options;
+  krb5_error_code rc;
+  krb5_creds in_creds, *out_creds = NULL;
+
+  static const char *kwlist[]={"self", "in_creds", "options" };
+
+  memset(&in_creds, 0, sizeof(in_creds));
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "O(O!O!(iz#)(iiii)OOOz#z#O)|i:get_credentials", (char **)kwlist, &self,
+				  principal_class, &client, principal_class, &server,
+				  &in_creds.keyblock.enctype, &in_creds.keyblock.contents, &in_creds.keyblock.length,
+				  &in_creds.times.authtime, &in_creds.times.starttime, &in_creds.times.endtime,
+				  &in_creds.times.renew_till, &tmp, &tmp, &tmp, &tmp,
+				  &in_creds.ticket.data,
+				  &in_creds.ticket.length,
+				  &in_creds.second_ticket.data,
+				  &in_creds.second_ticket.length,
+				  &tmp,
+				  &options))
+    return NULL;
+
+  tmp = PyObject_GetAttrString(client, "_princ");
+  in_creds.client = PyCObject_AsVoidPtr(tmp);
+  tmp = PyObject_GetAttrString(server, "_princ");
+  in_creds.server = PyCObject_AsVoidPtr(tmp);
+
+  conobj = tmp = PyObject_GetAttrString(self, "context");
+  tmp = PyObject_GetAttrString(tmp, "_ctx");
+  ctx = PyCObject_AsVoidPtr(tmp);
+  tmp = PyObject_GetAttrString(self, "_ccache");
+  ccache = PyCObject_AsVoidPtr(tmp);
+
+  rc = krb5_get_credentials(ctx, options, ccache, &in_creds, &out_creds);
+  if(rc)
+    return pk_error(rc);
+
+  if(out_creds->server != in_creds.server)
+    {
+      PyObject *subargs, *mykw = NULL;
+      krb5_principal princ = NULL;
+
+      krb5_copy_principal(ctx, out_creds->server, &princ);
+      subargs = Py_BuildValue("(O)", PyCObject_FromVoidPtrAndDesc(princ, ctx, destroy_principal));
+      server = PyEval_CallObjectWithKeywords(principal_class, subargs, mykw);
+      Py_XDECREF(mykw);
+      Py_XDECREF(subargs);
+    }
+  else
+    Py_XINCREF(server);
+  if(out_creds->client != in_creds.client)
+    {
+      PyObject *subargs, *mykw = NULL;
+      krb5_principal princ = NULL;
+
+      krb5_copy_principal(ctx, out_creds->client, &princ);
+      subargs = Py_BuildValue("(O)", PyCObject_FromVoidPtrAndDesc(princ, ctx, destroy_principal));
+      server = PyEval_CallObjectWithKeywords(principal_class, subargs, mykw);
+      Py_XDECREF(mykw);
+      Py_XDECREF(subargs);
+    }
+  else
+    Py_XINCREF(client);
+
+  {
+    int i, n;
+    for(n = 0; out_creds->addresses[n]; n++) /* */;
+    addrlist = PyTuple_New(n);
+    for(i = 0; i < n; i++)
+      PyTuple_SetItem(addrlist, i,
+		      Py_BuildValue("(iz#)", out_creds->addresses[i]->addrtype, out_creds->addresses[i]->contents,
+				    out_creds->addresses[i]->length));
+  }
+
+  {
+    int i, n;
+    for(n = 0; out_creds->authdata[n]; n++) /* */;
+    adlist = PyTuple_New(n);
+    for(i = 0; i < n; i++)
+      PyTuple_SetItem(addrlist, i,
+		      Py_BuildValue("(iz#)", out_creds->authdata[i]->ad_type, out_creds->authdata[i]->contents,
+				    out_creds->authdata[i]->length));
+  }
+
+  retval = Py_BuildValue("(NN(iz#)(iiii)iiNz#z#N)", client, server, out_creds->keyblock.enctype,
+			 out_creds->keyblock.contents, out_creds->keyblock.length,
+			 out_creds->times.authtime, out_creds->times.starttime,
+			 out_creds->times.endtime, out_creds->times.renew_till,
+			 out_creds->is_skey, out_creds->ticket_flags, addrlist,
+			 out_creds->ticket.data, out_creds->ticket.length,
+			 out_creds->second_ticket.data, out_creds->second_ticket.data,
+			 adlist);
+  krb5_free_creds(ctx, out_creds);
+
+  return retval;
+}
+
 static PyMethodDef ccache_methods[] = {
   {"__init__", (PyCFunction)CCache_init, METH_VARARGS|METH_KEYWORDS},
   {"__eq__", (PyCFunction)CCache_eq, METH_VARARGS},
   {"principal", (PyCFunction)CCache_principal, METH_VARARGS},
+  {"get_credentials", (PyCFunction)CCache_get_credentials, METH_VARARGS|METH_KEYWORDS},
   {NULL, NULL}
 };
 
@@ -2132,9 +2300,11 @@ pk_default_context(PyObject *self, PyObject *unused_args)
     {
       PyObject *klass, *subargs;
 
+      PyErr_Clear();
       klass = PyObject_GetAttrString(krb5_module, "Context");
       subargs = Py_BuildValue("()");
       retval = PyEval_CallObject(klass, subargs);
+      assert(retval);
       Py_DECREF(subargs);
       if(retval)
 	PyObject_SetAttrString(krb5_module, "_default_context", retval);
