@@ -12,6 +12,7 @@ Requires: python2 >= %{pyver}
 BuildRequires: python2-devel >= %{pyver}
 BuildRequires: krb5-devel >= 1.2.2
 Requires: krb5-libs >= 1.2.2
+BuildRequires: /bin/awk
 
 %description
 Allows python programs to use Kerberos 5 authentication/security.

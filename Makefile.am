@@ -1,7 +1,8 @@
 INCLUDES=$(PYTHON_INCLUDES) -I$(KRB5_HEADERDIR)
 python_LTLIBRARIES=krbVmodule.la
 
-krbVmodule_la_SOURCES=krb5defines.h krb5module.c krb5module.h \
+nodist_krbVmodule_la_SOURCES=krb5defines.h 
+krbVmodule_la_SOURCES=krb5module.c krb5module.h \
 	krb5util.c krb5util.h \
 	krb5err.c krb5err.h
 krbVmodule_la_LDFLAGS=-module -avoid-version
