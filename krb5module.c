@@ -1803,7 +1803,7 @@ destroy_ccache(void *cobj, void *desc)
 }
 
 static PyObject*
-CCache_init(PyObject *notself, PyObject *args, PyObject *kw)
+CCache__init__(PyObject *notself, PyObject *args, PyObject *kw)
 {
   PyObject *self;
   PyObject *cobj, *conobj = NULL, *new_cc = NULL, *new_cc_name = NULL, *primary_principal = NULL;
@@ -2014,7 +2014,7 @@ CCache_init_creds_keytab(PyObject *unself, PyObject *args, PyObject *kw)
     return NULL;
   memset(&my_creds, 0, sizeof(my_creds));
 
-  memset(&options, 0, sizeof(options));
+  krb5_get_init_creds_opt_init(&options);
   rc = krb5_get_init_creds_keytab(ctx, &my_creds, princ, kt, 0, NULL, &options);
   if(rc)
     return pk_error(rc);
@@ -2024,6 +2024,51 @@ CCache_init_creds_keytab(PyObject *unself, PyObject *args, PyObject *kw)
     return pk_error(rc);
 
   krb5_free_cred_contents(ctx, &my_creds);
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+static PyObject*
+CCache_initialize(PyObject *unself, PyObject *args, PyObject *kw)
+{
+  static const char *kwlist[] = {"self", "principal", NULL};
+  PyObject *self, *principal = NULL, *conobj = NULL, *tmp;
+  krb5_ccache ccache = NULL;
+  krb5_context ctx = NULL;
+  krb5_principal princ = NULL;
+  krb5_error_code rc;
+
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "OO:initialize", (char **)kwlist,
+				  &self, &principal))
+    return NULL;
+
+  conobj = tmp = PyObject_GetAttrString(self, "context");
+  if(tmp)
+    {
+      tmp = PyObject_GetAttrString(tmp, "_ctx");
+      if(tmp)
+	ctx = PyCObject_AsVoidPtr(tmp);
+    }
+  tmp = PyObject_GetAttrString(self, "_ccache");
+  if(tmp)
+    ccache = PyCObject_AsVoidPtr(tmp);
+  if(principal == Py_None)
+    principal = NULL;
+  if(!principal)
+    {
+      PyErr_SetNone(PyExc_ValueError);
+      return NULL;
+    }
+  tmp = PyObject_GetAttrString(principal, "_princ");
+  if(tmp)
+    princ = PyCObject_AsVoidPtr(tmp);
+  else
+    return NULL;
+
+  rc = krb5_cc_initialize(ctx, ccache, princ);
+  if(rc)
+    return pk_error(rc);
 
   Py_INCREF(Py_None);
   return Py_None;
@@ -2179,11 +2224,12 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyMethodDef ccache_methods[] = {
-  {"__init__", (PyCFunction)CCache_init, METH_VARARGS|METH_KEYWORDS},
+  {"__init__", (PyCFunction)CCache__init__, METH_VARARGS|METH_KEYWORDS},
   {"__eq__", (PyCFunction)CCache_eq, METH_VARARGS},
   {"principal", (PyCFunction)CCache_principal, METH_VARARGS|METH_KEYWORDS},
   {"get_credentials", (PyCFunction)CCache_get_credentials, METH_VARARGS|METH_KEYWORDS},
   {"init_creds_keytab", (PyCFunction)CCache_init_creds_keytab, METH_VARARGS|METH_KEYWORDS},
+  {"init", (PyCFunction)CCache_initialize, METH_VARARGS|METH_KEYWORDS},
   {NULL, NULL}
 };
 

@@ -8,5 +8,5 @@ function printdef(sym)
 #/^ *(ec|error_code)[[:blank:]]+[[:upper:][:digit:]_]+[[:blank:]]*,/ { printdef(substr($2, 0, length($2)-1)) }
 /^#if 0/ { skipit++; }
 /^#endif/ { if(skipit > 0) skipit--; }
-/^#define[[:blank:]]+(HAVE_|SIZEOF_|KRB5PLACEHOLD_|FALSE|TRUE)/ {next;}
+/^#define[[:blank:]]+(HAVE_|SIZEOF_|KRB5PLACEHOLD_|FALSE|TRUE|KRB5INT_BEGIN_DECLS)/ {next;}
 /^#define[[:blank:]]+[[:upper:][:digit:]_]+[[:blank:]]+(\(?(\(krb5_msgtype\))?[[:xdigit:]\-x]+\)?|[[:upper:][:digit:]_]+)[[:blank:]]?.*$/ { printdef($2); }
