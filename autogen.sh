@@ -51,6 +51,7 @@ TOPDIR=`pwd`
 for I in .; do
 	echo "processing $I"
 	(cd $I
+	libtoolize --force
 	aclocal -I $TOPDIR
 	automake --add-missing
 	autoconf
