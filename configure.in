@@ -1,0 +1,31 @@
+AC_INIT
+AM_CONFIG_HEADER(config.h)
+AM_INIT_AUTOMAKE(krb5module, 1.0)
+
+AC_PREFIX_DEFAULT(/usr)
+
+AC_PROG_INSTALL
+AC_DISABLE_STATIC
+AC_PROG_LIBTOOL
+AM_PATH_PYTHON_JH(2.1)
+AM_CHECK_PYTHON_HEADERS(, AC_MSG_ERROR([you need to have the python development headers installed]))
+
+krb5_prefix=
+for I in /usr /usr/kerberos /usr/athena; do
+	if test -f ${I}/include/krb5.h; then
+		krb5_prefix=$I
+		break
+	fi
+done
+if test -n "$krb5_prefix"; then
+	KRB5_HEADERS=${krb5_prefix}/include
+	KRB5_LIBS="-L${krb5_prefix}/lib -lkrb5"
+	AC_SUBST(KRB5_HEADERS)
+	AC_SUBST(KRB5_LIBS)
+else
+	AC_MSG_ERROR([A Kerberos 5 installation was not found])
+fi
+
+AC_OUTPUT([
+Makefile
+])

@@ -7,7 +7,7 @@
  * Licensed under the LGPL.
  *
  * Written by Elliot Lee <sopwith@redhat.com>
- * Not tested.
+ * Not completely tested (yet).
  */
 #include "krb5module.h"
 #include "krb5err.h"
@@ -27,6 +27,7 @@ krb5_error_code krb5_free_krbhst KRB5_PROTOTYPE((krb5_context, char * const *));
 
 static PyObject *pk_default_context(PyObject *self, PyObject *unused_args);
 static void destroy_ac(void *cobj, void *desc);
+static void destroy_principal(void *cobj, void *desc);
 
 static PyObject *krb5_module, *context_class, *auth_context_class, *principal_class, *ccache_class, *rcache_class, *keytab_class;
 
@@ -482,9 +483,22 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
   tmp = PyInt_FromLong(ap_req_options);
   PyTuple_SetItem(retval, 1, tmp);
   {
-    
+    PyObject *subargs, *otmp, *mykw = NULL;
+    krb5_principal princ;
+
+    krb5_copy_principal(kctx, ticket->server, &princ);
+    otmp = PyCObject_FromVoidPtrAndDesc(princ, kctx, destroy_principal);
+    subargs = Py_BuildValue("(O)", otmp);
+    mykw = PyDict_New();
+    PyDict_SetItemString(kw, "context", self); /* Just pass existing keywords straight along */
+    tmp = PyEval_CallObjectWithKeywords(principal_class, subargs, mykw);
+    Py_DECREF(subargs);
+    Py_XDECREF(mykw);
+    Py_DECREF(otmp);
+
+    PyTuple_SetItem(retval, 2, tmp);
   }
-  krb5_free_ticket(ctx, ticket);
+  krb5_free_ticket(kctx, ticket);
 
   return retval;
 }
