@@ -1,6 +1,6 @@
 AC_INIT
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(krb5module, 1.0.2)
+AM_INIT_AUTOMAKE(krbVmodule, 1.0.2)
 
 AC_PREFIX_DEFAULT(/usr)
 
@@ -28,4 +28,5 @@ fi
 
 AC_OUTPUT([
 Makefile
+krbVmodule.spec
 ])

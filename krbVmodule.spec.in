@@ -1,0 +1,40 @@
+%define pyver 2.1
+
+Summary: Python extension module for Kerberos 5
+Name: krbV-python%{pyver}
+Version: @VERSION@
+Release: 1
+Copyright: LGPL
+Group: Development/Languages
+Source: krbVmodule-%{version}.tar.gz
+Buildroot: /var/tmp/krb5module-root
+Requires: python2 >= %{pyver}
+BuildRequires: python2-devel >= %{pyver}
+BuildRequires: krb5-devel >= 1.2.2
+Requires: krb5-libs >= 1.2.2
+
+%description
+Allows python programs to use Kerberos 5 authentication/security.
+
+%prep
+%setup -q -n krbVmodule-%{version}
+
+%build
+%configure
+make %{?_smp_mflags}
+
+%install
+rm -rf $RPM_BUILD_ROOT
+mkdir -p $RPM_BUILD_ROOT/usr/lib/python%{pyver}/site-packages
+%makeinstall
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files
+%doc README
+/usr/lib/python%{pyver}/site-packages/krbVmodule.so
+
+%changelog
+* Tue Sep 25 2001 Elliot Lee <sopwith@redhat.com>
+- Initial version
