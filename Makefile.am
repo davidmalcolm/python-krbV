@@ -1,4 +1,4 @@
-INCLUDES=$(PYTHON_INCLUDES) -I$(KRB5_HEADERS)
+INCLUDES=$(PYTHON_INCLUDES) -I$(KRB5_HEADERDIR)
 python_LTLIBRARIES=krb5module.la
 
 krb5module_la_SOURCES=krb5defines.h krb5module.c krb5module.h \
@@ -7,7 +7,7 @@ krb5module_la_SOURCES=krb5defines.h krb5module.c krb5module.h \
 krb5module_la_LDFLAGS=-module -avoid-version
 krb5module_la_LIBADD=$(KRB5_LIBS)
 
-DEFFILES=$(KRB5_HEADERS)/krb5.h
+DEFFILES=$(KRB5_HEADERDIR)/krb5.h
 krb5defines.h: $(DEFFILES) gendefines.awk
 	awk -f $(srcdir)/gendefines.awk $(DEFFILES) > $@
 
