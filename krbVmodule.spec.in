@@ -29,6 +29,7 @@ make %{?_smp_mflags}
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/%{_libdir}/python%{pyver}/site-packages
 %makeinstall
+rm -f $RPM_BUILD_ROOT/%{_libdir}/python%{pyver}/site-packages/*.la
 
 %clean
 rm -rf $RPM_BUILD_ROOT
