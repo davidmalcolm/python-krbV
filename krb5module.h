@@ -7,16 +7,4 @@
 
 #include <netinet/in.h>
 
-typedef struct {
-  PyObject_HEAD
-
-  krb5_auth_context auth_context;
-} PK_AuthenticationContext;
-
-typedef struct {
-  PyObject_HEAD
-
-  krb5_principal principal;
-} PK_Principal;
-
 #endif

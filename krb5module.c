@@ -47,7 +47,7 @@ Context_init(PyObject *notself, PyObject *args)
 
   rc = krb5_init_context(&ctx);
   if(rc)
-    pk_error(rc);
+    return pk_error(rc);
   else
     {
       cobj = PyCObject_FromVoidPtr(ctx, (void (*)(void*))krb5_free_context);
@@ -1155,6 +1155,86 @@ AuthContext_setattr(PyObject *unself, PyObject *args)
   return Py_None;
 }
 
+static PyObject *
+AuthContext_rd_priv(PyObject *unself, PyObject *args)
+{
+  PyObject *self, *tmp, *retval;
+  krb5_data inbuf, outbuf;
+  krb5_auth_context ac = NULL;
+  krb5_error_code rc;
+  krb5_context ctx = NULL;
+  krb5_replay_data rdata = {0};
+
+  if(!PyArg_ParseTuple(args, "Os#", &self, &inbuf.data, &inbuf.length))
+    return NULL;
+
+  tmp = PyObject_GetAttrString(self, "context");
+  if(tmp)
+    {
+      tmp = PyObject_GetAttrString(tmp, "_ctx");
+      if(tmp)
+	ctx = PyCObject_AsVoidPtr(tmp);
+      if(!ctx)
+	return NULL;
+    }
+  else
+    return NULL;
+  tmp = PyObject_GetAttrString(self, "_ac");
+  if(tmp)
+    ac = PyCObject_AsVoidPtr(tmp);
+  if(!ac)
+    return NULL;
+
+  memset(&outbuf, 0, sizeof(outbuf));
+  rc = krb5_rd_priv(ctx, ac, &inbuf, &outbuf, &rdata);
+  if(rc)
+    return pk_error(rc);
+
+  retval = PyString_FromStringAndSize(outbuf.data, outbuf.length);
+  free(outbuf.data);
+  return retval;
+}
+
+static PyObject *
+AuthContext_mk_priv(PyObject *unself, PyObject *args)
+{
+  PyObject *self, *tmp, *retval;
+  krb5_data inbuf, outbuf;
+  krb5_auth_context ac = NULL;
+  krb5_error_code rc;
+  krb5_context ctx = NULL;
+  krb5_replay_data rdata = {0};
+
+  if(!PyArg_ParseTuple(args, "Os#", &self, &inbuf.data, &inbuf.length))
+    return NULL;
+
+  tmp = PyObject_GetAttrString(self, "context");
+  if(tmp)
+    {
+      tmp = PyObject_GetAttrString(tmp, "_ctx");
+      if(tmp)
+	ctx = PyCObject_AsVoidPtr(tmp);
+      if(!ctx)
+	return NULL;
+    }
+  else
+    return NULL;
+  tmp = PyObject_GetAttrString(self, "_ac");
+  if(tmp)
+    ac = PyCObject_AsVoidPtr(tmp);
+  if(!ac)
+    return NULL;
+
+  memset(&outbuf, 0, sizeof(outbuf));
+  rc = krb5_mk_priv(ctx, ac, &inbuf, &outbuf, &rdata);
+  if(rc)
+    return pk_error(rc);
+
+  retval = PyString_FromStringAndSize(outbuf.data, outbuf.length);
+  free(outbuf.data);
+  return retval;
+}
+
 static void
 destroy_ac(void *cobj, void *desc)
 {
@@ -1239,6 +1319,8 @@ AuthContext_genaddrs(PyObject *notself, PyObject *args, PyObject *kw)
 static PyMethodDef auth_context_methods[] = {
   {"__init__", (PyCFunction)AuthContext_init, METH_VARARGS|METH_KEYWORDS},
   {"genaddrs", (PyCFunction)AuthContext_genaddrs, METH_VARARGS|METH_KEYWORDS},
+  {"mk_priv", (PyCFunction)AuthContext_mk_priv, METH_VARARGS|METH_KEYWORDS},
+  {"rd_priv", (PyCFunction)AuthContext_rd_priv, METH_VARARGS|METH_KEYWORDS},
   {NULL, NULL}
 };
 
@@ -2002,15 +2084,15 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 	  for(i = 0; i < n; i++)
 	    {
 	      PyObject *otmp = PySequence_GetItem(authdata_tmp, i);
-	      if(PySequence_Check(otmp))
-		{
-		  if(!PyArg_ParseTuple(otmp, "z#i", &adata[i].contents, &adata[i].length, &adata[i].ad_type))
-		    return NULL;
-		}
-	      else if(PyString_Check(otmp))
+	      if(PyString_Check(otmp))
 		{
 		  adata[i].length = PyString_GET_SIZE(otmp);
 		  adata[i].contents = PyString_AS_STRING(otmp);
+		}
+	      else if(PySequence_Check(otmp))
+		{
+		  if(!PyArg_ParseTuple(otmp, "z#i", &adata[i].contents, &adata[i].length, &adata[i].ad_type))
+		    return NULL;
 		}
 	      else
 		{
