@@ -71,7 +71,11 @@ Context_getattr(PyObject *unself, PyObject *args)
     {
       PyObject *ctx;
       ctx = PyObject_GetAttrString(self, "_ctx");
+      if(!ctx)
+	return NULL;
       kctx = PyCObject_AsVoidPtr(ctx);
+      if(!kctx)
+	return NULL;
     }
 
   if(!strcmp(name, "default_realm"))
@@ -112,7 +116,11 @@ Context_setattr(PyObject *unself, PyObject *args)
     {
       PyObject *ctx;
       ctx = PyObject_GetAttrString(self, "_ctx");
+      if(!ctx)
+	return NULL;
       kctx = PyCObject_AsVoidPtr(ctx);
+      if(!kctx)
+	return NULL;
     }
   if(!strcmp(name, "default_realm"))
     {
@@ -247,7 +255,7 @@ static PyObject*
 Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
-  PyObject *ctx, *retval, *self, *in_data = NULL, *options = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *tmp,
+  PyObject *ctx, *retval, *self, *in_data = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *tmp,
     *auth_context = NULL, *credso = NULL;
   krb5_auth_context ac_out = NULL;
   krb5_data outbuf, inbuf;
@@ -274,8 +282,6 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
 
-  if(options)
-    ap_req_options = PyInt_AsLong(options);
   if(in_data)
     {
       inbuf.data = PyString_AsString(in_data);
@@ -399,8 +405,7 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
       Py_XDECREF(mykw);
     }
   PyTuple_SetItem(retval, 0, auth_context);
-  tmp = PyString_FromStringAndSize(outbuf.data, outbuf.length);
-  PyTuple_SetItem(retval, 1, tmp);
+  PyTuple_SetItem(retval, 1, PyString_FromStringAndSize(outbuf.data, outbuf.length));
   krb5_free_data_contents(kctx, &outbuf);
 
   return retval;
@@ -482,8 +487,7 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
       Py_XDECREF(mykw);
     }
   PyTuple_SetItem(retval, 0, auth_context);
-  tmp = PyInt_FromLong(ap_req_options);
-  PyTuple_SetItem(retval, 1, tmp);
+  PyTuple_SetItem(retval, 1, PyInt_FromLong(ap_req_options));
   {
     PyObject *subargs, *otmp, *mykw = NULL;
     krb5_principal princ;
@@ -497,6 +501,12 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
     Py_DECREF(subargs);
     Py_XDECREF(mykw);
     Py_DECREF(otmp);
+
+    if(!tmp)
+      {
+	Py_DECREF(retval);
+	return NULL;
+      }
 
     PyTuple_SetItem(retval, 2, tmp);
   }
@@ -1044,6 +1054,7 @@ AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
       else
 	cobj = PyCObject_FromVoidPtrAndDesc(ac, ctx, destroy_ac);
       PyObject_SetAttrString(self, "_ac", cobj);
+      Py_DECREF(cobj);
       PyObject_SetAttrString(self, "context", conobj);
     }
 
@@ -1145,6 +1156,8 @@ Principal_getattr(PyObject *unself, PyObject *args)
       tmp = PyObject_GetAttrString(self, "_princ");
       if(tmp)
 	princ = PyCObject_AsVoidPtr(tmp);
+      else
+	return NULL;
     }
 
   PyErr_Clear();
@@ -1277,6 +1290,7 @@ Principal_init(PyObject *notself, PyObject *args, PyObject *kw)
       else
 	cobj = PyCObject_FromVoidPtrAndDesc(princ, ctx, destroy_principal);
       PyObject_SetAttrString(self, "_princ", cobj);
+      Py_DECREF(cobj);
       PyObject_SetAttrString(self, "context", conobj);
     }
 
@@ -1302,10 +1316,16 @@ Principal_getitem(PyObject *unself, PyObject *args)
       tmp = PyObject_GetAttrString(tmp, "_ctx");
       if(tmp)
 	ctx = PyCObject_AsVoidPtr(tmp);
+      else
+	return NULL;
     }
+  else
+    return NULL;
   tmp = PyObject_GetAttrString(self, "_princ");
   if(tmp)
     princ = PyCObject_AsVoidPtr(tmp);
+  else
+    return NULL;
 
   if(index >= krb5_princ_size(ctx, princ))
     {
@@ -1718,6 +1738,8 @@ CCache_principal(PyObject *unself, PyObject *args, PyObject *kw)
     Py_DECREF(otmp);
     if(retval)
       PyObject_SetAttrString(self, "_principal", retval);
+    else
+      return NULL;
   }
 
   return retval;
@@ -1753,6 +1775,8 @@ CCache_init_creds_keytab(PyObject *unself, PyObject *args, PyObject *kw)
   tmp = PyObject_GetAttrString(keytab, "_keytab");
   if(tmp)
     kt = PyCObject_AsVoidPtr(tmp);
+  if(principal == Py_None)
+    principal = NULL;
   if(!principal)
     {
       tmp = Py_BuildValue("(O)", self);
@@ -1762,6 +1786,8 @@ CCache_init_creds_keytab(PyObject *unself, PyObject *args, PyObject *kw)
   tmp = PyObject_GetAttrString(principal, "_princ");
   if(tmp)
     princ = PyCObject_AsVoidPtr(tmp);
+  else
+    return NULL;
   memset(&my_creds, 0, sizeof(my_creds));
 
   memset(&options, 0, sizeof(options));
@@ -1810,21 +1836,27 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
     return NULL;
 
   tmp = PyObject_GetAttrString(client, "_princ");
+  if(!tmp) return NULL;
+  if(!tmp) return NULL;
   in_creds.client = PyCObject_AsVoidPtr(tmp);
   tmp = PyObject_GetAttrString(server, "_princ");
+  if(!tmp) return NULL;
   in_creds.server = PyCObject_AsVoidPtr(tmp);
 
   conobj = tmp = PyObject_GetAttrString(self, "context");
+  if(!tmp) return NULL;
   tmp = PyObject_GetAttrString(tmp, "_ctx");
+  if(!tmp) return NULL;
   ctx = PyCObject_AsVoidPtr(tmp);
   tmp = PyObject_GetAttrString(self, "_ccache");
+  if(!tmp) return NULL;
   ccache = PyCObject_AsVoidPtr(tmp);
 
   rc = krb5_get_credentials(ctx, options, ccache, &in_creds, &out_creds);
   if(rc)
     return pk_error(rc);
 
-  if(out_creds->server != in_creds.server)
+  if(out_creds->server != in_creds.server && !krb5_principal_compare(ctx, out_creds->server, in_creds.server))
     {
       PyObject *subargs, *mykw = NULL;
       krb5_principal princ = NULL;
@@ -1836,20 +1868,21 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
       Py_XDECREF(subargs);
     }
   else
-    Py_XINCREF(server);
-  if(out_creds->client != in_creds.client)
+    Py_INCREF(server);
+
+  if(out_creds->client != in_creds.client && !krb5_principal_compare(ctx, out_creds->client, in_creds.client))
     {
       PyObject *subargs, *mykw = NULL;
       krb5_principal princ = NULL;
 
       krb5_copy_principal(ctx, out_creds->client, &princ);
       subargs = Py_BuildValue("(O)", PyCObject_FromVoidPtrAndDesc(princ, ctx, destroy_principal));
-      server = PyEval_CallObjectWithKeywords(principal_class, subargs, mykw);
+      client = PyEval_CallObjectWithKeywords(principal_class, subargs, mykw);
       Py_XDECREF(mykw);
       Py_XDECREF(subargs);
     }
   else
-    Py_XINCREF(client);
+    Py_INCREF(client);
 
   if(out_creds->addresses)
     {
