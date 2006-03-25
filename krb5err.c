@@ -42,6 +42,6 @@ pk_error_init(PyObject *module)
   PyObject *dict;
 
   dict = PyModule_GetDict(module);
-  pk_exception = PyErr_NewException("krb5.Krb5Error", NULL, NULL);
+  pk_exception = PyErr_NewException("krbV.Krb5Error", NULL, NULL);
   PyDict_SetItemString(dict, "Krb5Error", pk_exception);
 }

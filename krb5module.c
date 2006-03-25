@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 
 #if !defined(_KRB5_INT_H) && defined(KRB5_PROTOTYPE)
 krb5_error_code krb5_get_krbhst KRB5_PROTOTYPE((krb5_context, const krb5_data *, char ***));
@@ -798,6 +799,7 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
   krb5_auth_context ac_out = NULL;
   krb5_keytab kt;
   krb5_principal pserver;
+  krb5_ticket *cticket;
   krb5_flags ap_req_options = 0;
   krb5_error_code rc = 0;
   int free_keytab = 0;
@@ -851,20 +853,42 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
     ap_req_options = PyInt_AsLong(options);
 
   Py_BEGIN_ALLOW_THREADS
-  rc = krb5_recvauth(kctx, &ac_out, fd_ptr, appl_version, pserver, ap_req_options, kt, NULL);
+  rc = krb5_recvauth(kctx, &ac_out, fd_ptr, appl_version, pserver, ap_req_options, kt, &cticket);
   Py_END_ALLOW_THREADS
   if(rc)
     return pk_error(rc);
 
+  retval = PyTuple_New(2);
+
+  if (cticket->enc_part2)
+    {
+      PyObject *cprinc;
+
+      if (!(cprinc = make_principal(self, kctx, cticket->enc_part2->client)))
+	{
+	  Py_DECREF(retval);
+	  krb5_free_ticket(kctx, cticket);
+	  return NULL;
+	}
+      PyTuple_SetItem(retval, 1, cprinc);
+    }
+  else
+    {
+      PyTuple_SetItem(retval, 1, Py_None);
+      Py_INCREF(Py_None);
+    }
+  krb5_free_ticket(kctx, cticket);
+
   {
-    PyObject *subargs, *mykw = NULL, *otmp;
+    PyObject *subargs, *mykw = NULL, *otmp, *auth_context;
 
     subargs = Py_BuildValue("()");
     mykw = PyDict_New();
     PyDict_SetItemString(mykw, "context", self);
     otmp = PyCObject_FromVoidPtrAndDesc(ac_out, kctx, destroy_ac);
     PyDict_SetItemString(mykw, "ac", otmp);
-    retval = PyEval_CallObjectWithKeywords(auth_context_class, subargs, mykw);
+    auth_context = PyEval_CallObjectWithKeywords(auth_context_class, subargs, mykw);
+    PyTuple_SetItem(retval, 0, auth_context);
     Py_DECREF(otmp);
     Py_DECREF(subargs);
     Py_XDECREF(mykw);
@@ -989,6 +1013,36 @@ pk_context_make_class(PyObject *module)
   return retval;
 }
 
+/* Convert a krb5_address to a string representation. */
+static PyObject *
+addr_to_str(krb5_address *kaddr)
+{
+  const char* ret = NULL;
+  char *addr = NULL;
+
+  if (kaddr->addrtype == ADDRTYPE_INET)
+    {
+      addr = alloca(INET_ADDRSTRLEN);
+      ret = inet_ntop(AF_INET, kaddr->contents,
+		       addr, INET_ADDRSTRLEN);
+    }
+  else if (kaddr->addrtype == ADDRTYPE_INET6)
+    {
+      addr = alloca(INET6_ADDRSTRLEN);
+      ret = inet_ntop(AF_INET6, kaddr->contents,
+		       addr, INET6_ADDRSTRLEN);
+    }
+
+  if (addr == NULL || ret == NULL)
+    {
+      return NULL;
+    }
+  else
+    {
+      return PyString_FromString(addr);
+    }
+}
+
 /*********************** AuthContext **********************/
 static PyObject*
 AuthContext_getattr(PyObject *unself, PyObject *args)
@@ -1028,16 +1082,23 @@ AuthContext_getattr(PyObject *unself, PyObject *args)
     }
   else if(!strcmp(name, "addrs"))
     {
-      PyObject *ra1, *ra2;
+      PyObject *ra1, *ra2, *laddr, *raddr;
       krb5_address *a1=NULL, *a2=NULL;
       rc = krb5_auth_con_getaddrs(ctx, ac, &a1, &a2);
       if(rc)
 	return pk_error(rc);
       if(a1)
 	{
+	  laddr = addr_to_str(a1);
+	  if (laddr == NULL)
+	    {
+	      laddr = Py_None;
+	      Py_INCREF(Py_None);
+	    }
+	  
 	  ra1 = PyTuple_New(2);
 	  PyTuple_SetItem(ra1, 0, PyInt_FromLong(a1->addrtype));
-	  PyTuple_SetItem(ra1, 1, PyString_FromStringAndSize(a1->contents, a1->length));
+	  PyTuple_SetItem(ra1, 1, laddr);
 	  krb5_free_address(ctx, a1);
 	}
       else
@@ -1047,9 +1108,16 @@ AuthContext_getattr(PyObject *unself, PyObject *args)
 	}
       if(a2)
 	{
+	  raddr = addr_to_str(a2);
+	  if (raddr == NULL)
+	    {
+	      raddr = Py_None;
+	      Py_INCREF(Py_None);
+	    }
+
 	  ra2 = PyTuple_New(2);
 	  PyTuple_SetItem(ra2, 0, PyInt_FromLong(a2->addrtype));
-	  PyTuple_SetItem(ra2, 1, PyString_FromStringAndSize(a2->contents, a2->length));
+	  PyTuple_SetItem(ra2, 1, raddr);
 	  krb5_free_address(ctx, a2);
 	}
       else
