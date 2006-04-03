@@ -37,6 +37,7 @@ rm -f $RPM_BUILD_ROOT/%{_libdir}/python%{pyver}/site-packages/*.la
 rm -rf $RPM_BUILD_ROOT
 
 %files
+%defattr(-,root,root,-)
 %doc README
 %{_libdir}/python%{pyver}/site-packages/krbVmodule.so
 
