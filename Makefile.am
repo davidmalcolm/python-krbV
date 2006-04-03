@@ -13,9 +13,9 @@ DEFFILES=$(KRB5_HEADERDIR)/krb5.h
 krb5defines.h: $(DEFFILES) gendefines.awk
 	awk -f $(srcdir)/gendefines.awk $(DEFFILES) > $@
 
-EXTRA_DIST=gendefines.awk krbVmodule.spec.in krbV-code-snippets.py
+EXTRA_DIST=gendefines.awk python-krbV.spec.in krbV-code-snippets.py
 BUILT_SOURCES=krb5defines.h
 CLEANFILES=krb5defines.h
 
-dist-hook: krbVmodule.spec
-	cp krbVmodule.spec $(distdir)
+dist-hook: python-krbV.spec
+	cp python-krbV.spec $(distdir)
