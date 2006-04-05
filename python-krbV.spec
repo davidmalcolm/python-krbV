@@ -1,7 +1,7 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(plat_specific=True)")} 
 
 Name: python-krbV
-Version: @VERSION@
+Version: %(/bin/awk '/AM_INIT_AUTOMAKE/ { print substr($2, 0, length($2)-1) }' configure.in)
 Release: 3%{?dist}
 Summary: Python extension module for Kerberos 5
 
@@ -12,6 +12,7 @@ Source: python-krbV-%{version}.tar.gz
 
 Buildroot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+BuildRequires: python
 BuildRequires: python-devel
 BuildRequires: krb5-devel >= 1.2.2
 BuildRequires: /bin/awk
