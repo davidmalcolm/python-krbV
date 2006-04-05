@@ -2,7 +2,7 @@
 
 Name: python-krbV
 Version: @VERSION@
-Release: 2%{?dist}
+Release: 3%{?dist}
 Summary: Python extension module for Kerberos 5
 
 Group: Development/Languages
@@ -27,6 +27,7 @@ python-krbV allows python programs to use Kerberos 5 authentication/security.
 
 %build
 export LIBNAME=%{_lib}
+export CFLAGS="%{optflags} -Wextra"
 %configure
 %{__make} %{?_smp_mflags}
 
@@ -41,7 +42,7 @@ export LIBNAME=%{_lib}
 
 %files
 %defattr(-,root,root,-)
-%doc README
+%doc README krbV-code-snippets.py
 %{python_sitelib}/krbVmodule.so
 
 %changelog

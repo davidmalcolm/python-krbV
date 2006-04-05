@@ -37,7 +37,7 @@ static void destroy_principal(void *cobj, void *desc);
 static PyObject *krb5_module, *context_class, *auth_context_class, *principal_class, *ccache_class, *rcache_class, *keytab_class;
 
 static PyObject*
-Context_init(PyObject *notself, PyObject *args)
+Context_init(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self;
   PyObject *cobj;
@@ -62,7 +62,7 @@ Context_init(PyObject *notself, PyObject *args)
 }
 
 static PyObject*
-Context_getattr(PyObject *unself, PyObject *args)
+Context_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *retval = NULL, *self;
@@ -104,7 +104,7 @@ Context_getattr(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-Context_setattr(PyObject *unself, PyObject *args)
+Context_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *self, *value, *nameo;
@@ -149,7 +149,7 @@ Context_setattr(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-Context_cc_default(PyObject *unself, PyObject *args, PyObject *kw)
+Context_cc_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
   PyObject *ctx, *retval, *self;
@@ -183,7 +183,7 @@ Context_cc_default(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-Context_rc_default(PyObject *unself, PyObject *args, PyObject *kw)
+Context_rc_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
   PyObject *ctx, *retval, *self;
@@ -220,7 +220,7 @@ Context_rc_default(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-Context_kt_default(PyObject *unself, PyObject *args, PyObject *kw)
+Context_kt_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
   PyObject *ctx, *retval, *self;
@@ -416,16 +416,20 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
   return retval;
 }
 
+#ifdef Py_DEBUG
 static int
 check_obj(PyObject *op)
 {
-#ifdef Py_DEBUG
   return (!op->_ob_prev || !op->_ob_next ||
 	  op->_ob_prev->_ob_next != op || op->_ob_next->_ob_prev != op || op->ob_refcnt <= 0);
-#else
-  return 0;
-#endif
 }
+#else
+static int
+check_obj(PyObject *op __UNUSED)
+{
+  return 0;
+}
+#endif
 
 static PyObject *
 make_principal(PyObject *ctx_obj, krb5_context ctx, krb5_principal orig_princ)
@@ -898,7 +902,7 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-Context_mk_rep(PyObject *unself, PyObject *args, PyObject *kw)
+Context_mk_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
   PyObject *ctx, *retval, *self, *auth_context = NULL, *tmp;
@@ -933,7 +937,7 @@ Context_mk_rep(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-Context_rd_rep(PyObject *unself, PyObject *args, PyObject *kw)
+Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
   PyObject *ctx, *self, *auth_context = NULL, *in_data, *tmp;
@@ -971,25 +975,25 @@ Context_rd_rep(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyMethodDef context_methods[] = {
-  {"__init__", Context_init, METH_VARARGS|METH_KEYWORDS},
-  {"default_ccache", (PyCFunction)Context_cc_default, METH_VARARGS|METH_KEYWORDS},
-  {"default_rcache", (PyCFunction)Context_rc_default, METH_VARARGS|METH_KEYWORDS},
-  {"default_keytab", (PyCFunction)Context_kt_default, METH_VARARGS|METH_KEYWORDS},
-  {"mk_req", (PyCFunction)Context_mk_req, METH_VARARGS|METH_KEYWORDS},
-  {"rd_req", (PyCFunction)Context_rd_req, METH_VARARGS|METH_KEYWORDS},
-  {"sendauth", (PyCFunction)Context_sendauth, METH_VARARGS|METH_KEYWORDS},
-  {"recvauth", (PyCFunction)Context_recvauth, METH_VARARGS|METH_KEYWORDS},
-  {"mk_rep", (PyCFunction)Context_mk_rep, METH_VARARGS|METH_KEYWORDS},
-  {"rd_rep", (PyCFunction)Context_rd_rep, METH_VARARGS|METH_KEYWORDS},
-  {NULL, NULL}
+  {"__init__", Context_init, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"default_ccache", (PyCFunction)Context_cc_default, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"default_rcache", (PyCFunction)Context_rc_default, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"default_keytab", (PyCFunction)Context_kt_default, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"mk_req", (PyCFunction)Context_mk_req, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"rd_req", (PyCFunction)Context_rd_req, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"sendauth", (PyCFunction)Context_sendauth, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"recvauth", (PyCFunction)Context_recvauth, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"mk_rep", (PyCFunction)Context_mk_rep, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"rd_rep", (PyCFunction)Context_rd_rep, METH_VARARGS|METH_KEYWORDS, NULL},
+  {NULL, NULL, 0, NULL}
 };
 
 static PyObject *
 pk_context_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", Context_getattr, METH_VARARGS},
-    setattr = {"__setattr__", Context_setattr, METH_VARARGS};
+  static PyMethodDef getattr = {"__getattr__", Context_getattr, METH_VARARGS, NULL},
+    setattr = {"__setattr__", Context_setattr, METH_VARARGS, NULL};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
   dict = PyDict_New();
@@ -1045,7 +1049,7 @@ addr_to_str(krb5_address *kaddr)
 
 /*********************** AuthContext **********************/
 static PyObject*
-AuthContext_getattr(PyObject *unself, PyObject *args)
+AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *retval = NULL, *self, *tmp;
@@ -1140,7 +1144,7 @@ AuthContext_getattr(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-AuthContext_setattr(PyObject *unself, PyObject *args)
+AuthContext_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *self, *value, *nameo, *tmp;
@@ -1225,14 +1229,14 @@ AuthContext_setattr(PyObject *unself, PyObject *args)
 }
 
 static PyObject *
-AuthContext_rd_priv(PyObject *unself, PyObject *args)
+AuthContext_rd_priv(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp, *retval;
   krb5_data inbuf, outbuf;
   krb5_auth_context ac = NULL;
   krb5_error_code rc;
   krb5_context ctx = NULL;
-  krb5_replay_data rdata = {0};
+  krb5_replay_data rdata = {0, 0, 0};
 
   if(!PyArg_ParseTuple(args, "Os#", &self, &inbuf.data, &inbuf.length))
     return NULL;
@@ -1265,14 +1269,14 @@ AuthContext_rd_priv(PyObject *unself, PyObject *args)
 }
 
 static PyObject *
-AuthContext_mk_priv(PyObject *unself, PyObject *args)
+AuthContext_mk_priv(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp, *retval;
   krb5_data inbuf, outbuf;
   krb5_auth_context ac = NULL;
   krb5_error_code rc;
   krb5_context ctx = NULL;
-  krb5_replay_data rdata = {0};
+  krb5_replay_data rdata = {0, 0, 0};
 
   if(!PyArg_ParseTuple(args, "Os#", &self, &inbuf.data, &inbuf.length))
     return NULL;
@@ -1311,7 +1315,7 @@ destroy_ac(void *cobj, void *desc)
 }
 
 static PyObject*
-AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
+AuthContext_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   PyObject *self;
   PyObject *cobj, *conobj = NULL, *acobj = NULL;
@@ -1354,7 +1358,7 @@ AuthContext_init(PyObject *notself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-AuthContext_genaddrs(PyObject *notself, PyObject *args, PyObject *kw)
+AuthContext_genaddrs(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   PyObject *self, *fh, *tmp;
   int fd;
@@ -1386,19 +1390,19 @@ AuthContext_genaddrs(PyObject *notself, PyObject *args, PyObject *kw)
 }
 
 static PyMethodDef auth_context_methods[] = {
-  {"__init__", (PyCFunction)AuthContext_init, METH_VARARGS|METH_KEYWORDS},
-  {"genaddrs", (PyCFunction)AuthContext_genaddrs, METH_VARARGS|METH_KEYWORDS},
-  {"mk_priv", (PyCFunction)AuthContext_mk_priv, METH_VARARGS|METH_KEYWORDS},
-  {"rd_priv", (PyCFunction)AuthContext_rd_priv, METH_VARARGS|METH_KEYWORDS},
-  {NULL, NULL}
+  {"__init__", (PyCFunction)AuthContext_init, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"genaddrs", (PyCFunction)AuthContext_genaddrs, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"mk_priv", (PyCFunction)AuthContext_mk_priv, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"rd_priv", (PyCFunction)AuthContext_rd_priv, METH_VARARGS|METH_KEYWORDS, NULL},
+  {NULL, NULL, 0, NULL}
 };
 
 static PyObject *
 pk_auth_context_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", AuthContext_getattr, METH_VARARGS},
-    setattr = {"__setattr__", AuthContext_setattr, METH_VARARGS};
+  static PyMethodDef getattr = {"__getattr__", AuthContext_getattr, METH_VARARGS, NULL},
+    setattr = {"__setattr__", AuthContext_setattr, METH_VARARGS, NULL};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -1426,7 +1430,7 @@ pk_auth_context_make_class(PyObject *module)
 
 /************************* Principal **********************************/
 static PyObject*
-Principal_getattr(PyObject *unself, PyObject *args)
+Principal_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *retval = NULL, *self, *tmp;
@@ -1484,7 +1488,7 @@ Principal_getattr(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-Principal_setattr(PyObject *unself, PyObject *args)
+Principal_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *self, *value, *nameo, *tmp;
@@ -1537,7 +1541,7 @@ destroy_principal(void *cobj, void *desc)
 }
 
 static PyObject*
-Principal_init(PyObject *notself, PyObject *args, PyObject *kw)
+Principal_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   PyObject *self;
   PyObject *cobj, *conobj = NULL, *princobj;
@@ -1563,7 +1567,7 @@ Principal_init(PyObject *notself, PyObject *args, PyObject *kw)
       name = PyString_AsString(princobj);
       rc = krb5_parse_name(ctx, name, &princ);
     }
-  else if(PyObject_IsInstance(princobj, (PyObject *)&PyCObject_Type))
+  else if(PyCObject_Check(princobj))
     cobj = princobj;
   else
     {
@@ -1592,7 +1596,7 @@ Principal_init(PyObject *notself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-Principal_getitem(PyObject *unself, PyObject *args)
+Principal_getitem(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp, *retval;
   krb5_context ctx = NULL;
@@ -1633,7 +1637,7 @@ Principal_getitem(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-Principal_itemlen(PyObject *unself, PyObject *args)
+Principal_itemlen(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp;
   krb5_context ctx = NULL;
@@ -1658,7 +1662,7 @@ Principal_itemlen(PyObject *unself, PyObject *args)
 
 
 static PyObject*
-Principal_eq(PyObject *unself, PyObject *args)
+Principal_eq(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp, *other;
   krb5_context ctx = NULL;
@@ -1691,7 +1695,7 @@ Principal_eq(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-Principal_repr(PyObject *unself, PyObject *args)
+Principal_repr(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp, *retval;
   krb5_context ctx = NULL;
@@ -1725,20 +1729,20 @@ Principal_repr(PyObject *unself, PyObject *args)
 }
 
 static PyMethodDef principal_methods[] = {
-  {"__init__", (PyCFunction)Principal_init, METH_VARARGS|METH_KEYWORDS},
-  {"__getitem__", (PyCFunction)Principal_getitem, METH_VARARGS},
-  {"__len__", (PyCFunction)Principal_itemlen, METH_VARARGS},
-  {"__eq__", (PyCFunction)Principal_eq, METH_VARARGS},
-  {"__repr__", (PyCFunction)Principal_repr, METH_VARARGS},
-  {NULL, NULL}
+  {"__init__", (PyCFunction)Principal_init, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"__getitem__", (PyCFunction)Principal_getitem, METH_VARARGS, NULL},
+  {"__len__", (PyCFunction)Principal_itemlen, METH_VARARGS, NULL},
+  {"__eq__", (PyCFunction)Principal_eq, METH_VARARGS, NULL},
+  {"__repr__", (PyCFunction)Principal_repr, METH_VARARGS, NULL},
+  {NULL, NULL, 0, NULL}
 };
 
 static PyObject *
 pk_principal_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", Principal_getattr, METH_VARARGS},
-    setattr = {"__setattr__", Principal_setattr, METH_VARARGS};
+  static PyMethodDef getattr = {"__getattr__", Principal_getattr, METH_VARARGS, NULL},
+    setattr = {"__setattr__", Principal_setattr, METH_VARARGS, NULL};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -1765,7 +1769,7 @@ pk_principal_make_class(PyObject *module)
 
 /************************* Creds cache **********************************/
 static PyObject*
-CCache_getattr(PyObject *unself, PyObject *args)
+CCache_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *retval = NULL, *self, *tmp;
@@ -1820,7 +1824,7 @@ CCache_getattr(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-CCache_setattr(PyObject *unself, PyObject *args)
+CCache_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *self, *value, *nameo, *tmp;
@@ -1871,7 +1875,7 @@ destroy_ccache(void *cobj, void *desc)
 }
 
 static PyObject*
-CCache__init__(PyObject *notself, PyObject *args, PyObject *kw)
+CCache__init__(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   PyObject *self;
   PyObject *cobj, *conobj = NULL, *new_cc = NULL, *new_cc_name = NULL, *primary_principal = NULL;
@@ -1948,7 +1952,7 @@ CCache__init__(PyObject *notself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-CCache_eq(PyObject *unself, PyObject *args)
+CCache_eq(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp, *other;
   krb5_context ctx = NULL;
@@ -1982,7 +1986,7 @@ CCache_eq(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-CCache_principal(PyObject *unself, PyObject *args, PyObject *kw)
+CCache_principal(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context ctx = NULL;
   krb5_ccache ccache = NULL;
@@ -2038,7 +2042,7 @@ CCache_principal(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-CCache_init_creds_keytab(PyObject *unself, PyObject *args, PyObject *kw)
+CCache_init_creds_keytab(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   static const char *kwlist[] = {"self", "keytab", "principal", NULL};
   PyObject *self, *keytab = NULL, *principal = NULL, *conobj = NULL, *tmp;
@@ -2098,7 +2102,7 @@ CCache_init_creds_keytab(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-CCache_initialize(PyObject *unself, PyObject *args, PyObject *kw)
+CCache_initialize(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   static const char *kwlist[] = {"self", "principal", NULL};
   PyObject *self, *principal = NULL, *conobj = NULL, *tmp;
@@ -2143,7 +2147,7 @@ CCache_initialize(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
+CCache_get_credentials(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context ctx = NULL;
   krb5_ccache ccache = NULL;
@@ -2184,7 +2188,7 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 	  adata_ptrs[0] = &adata[0];
 	  adata_ptrs[1] = NULL;
 	  adata[0].length = PyString_GET_SIZE(authdata_tmp);
-	  adata[0].contents = PyString_AS_STRING(authdata_tmp);
+	  adata[0].contents = (krb5_octet *) PyString_AS_STRING(authdata_tmp);
 	}
       else  if(PySequence_Check(authdata_tmp))
 	{
@@ -2200,7 +2204,7 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 	      if(PyString_Check(otmp))
 		{
 		  adata[i].length = PyString_GET_SIZE(otmp);
-		  adata[i].contents = PyString_AS_STRING(otmp);
+		  adata[i].contents = (krb5_octet *) PyString_AS_STRING(otmp);
 		}
 	      else if(PySequence_Check(otmp))
 		{
@@ -2292,21 +2296,21 @@ CCache_get_credentials(PyObject *unself, PyObject *args, PyObject *kw)
 }
 
 static PyMethodDef ccache_methods[] = {
-  {"__init__", (PyCFunction)CCache__init__, METH_VARARGS|METH_KEYWORDS},
-  {"__eq__", (PyCFunction)CCache_eq, METH_VARARGS},
-  {"principal", (PyCFunction)CCache_principal, METH_VARARGS|METH_KEYWORDS},
-  {"get_credentials", (PyCFunction)CCache_get_credentials, METH_VARARGS|METH_KEYWORDS},
-  {"init_creds_keytab", (PyCFunction)CCache_init_creds_keytab, METH_VARARGS|METH_KEYWORDS},
-  {"init", (PyCFunction)CCache_initialize, METH_VARARGS|METH_KEYWORDS},
-  {NULL, NULL}
+  {"__init__", (PyCFunction)CCache__init__, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"__eq__", (PyCFunction)CCache_eq, METH_VARARGS, NULL},
+  {"principal", (PyCFunction)CCache_principal, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"get_credentials", (PyCFunction)CCache_get_credentials, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"init_creds_keytab", (PyCFunction)CCache_init_creds_keytab, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"init", (PyCFunction)CCache_initialize, METH_VARARGS|METH_KEYWORDS, NULL},
+  {NULL, NULL, 0, NULL}
 };
 
 static PyObject *
 pk_ccache_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", CCache_getattr, METH_VARARGS},
-    setattr = {"__setattr__", CCache_setattr, METH_VARARGS};
+  static PyMethodDef getattr = {"__getattr__", CCache_getattr, METH_VARARGS, NULL},
+    setattr = {"__setattr__", CCache_setattr, METH_VARARGS, NULL};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -2333,56 +2337,24 @@ pk_ccache_make_class(PyObject *module)
 
 /************************* replay cache **********************************/
 static PyObject*
-RCache_getattr(PyObject *unself, PyObject *args)
+RCache_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
+  /* In recent versions of Kerberos, the rcache has become a totally opaque
+     object, and there are no public methods to get information about it. */
+
+  PyObject *self;
   char *name;
-  PyObject *retval = NULL, *self, *tmp;
-  krb5_context ctx = NULL;
-  krb5_rcache rcache = NULL;
 
   if(!PyArg_ParseTuple(args, "Os:__getattr__", &self, &name))
     return NULL;
 
-  if(strcmp(name, "context") && strcmp(name, "_rcache"))
-    {
-      tmp = PyObject_GetAttrString(self, "context");
-      if(tmp)
-	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
-	}
-      tmp = PyObject_GetAttrString(self, "_rcache");
-      if(tmp)
-	rcache = PyCObject_AsVoidPtr(tmp);
-    }
-
-  if(!strcmp(name, "name"))
-    {
-      char *nom;
-
-      nom = krb5_rc_get_name(ctx, rcache);
-      retval = PyString_FromString(nom);
-    }
-  else if(!strcmp(name, "type"))
-    {
-      char *nom;
-
-      nom = krb5_rc_get_type(ctx, rcache);
-      retval = PyString_FromString(nom);
-    }
-  else
-    {
-      PyErr_Format(PyExc_AttributeError, "%.50s instance has no attribute '%.400s'",
-		   PyString_AS_STRING(((PyInstanceObject *)self)->in_class->cl_name), name);
-      retval = NULL;
-    }
-
-  return retval;
+  PyErr_Format(PyExc_AttributeError, "%.50s instance has no attribute '%.400s'",
+               PyString_AS_STRING(((PyInstanceObject *)self)->in_class->cl_name), name);
+  return NULL;
 }
 
 static PyObject*
-RCache_setattr(PyObject *unself, PyObject *args)
+RCache_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *self, *value, *nameo, *tmp;
@@ -2411,10 +2383,7 @@ RCache_setattr(PyObject *unself, PyObject *args)
     }
 
   if((!strcmp(name, "context") && ctx)
-     || (!strcmp(name, "_rcache") && rcache)
-     || !strcmp(name, "name")
-     || !strcmp(name, "type")
-     )
+     || (!strcmp(name, "_rcache") && rcache))
     {
       PyErr_Format(PyExc_AttributeError, "You cannot set attribute '%.400s'", name);
       return NULL;
@@ -2426,21 +2395,15 @@ RCache_setattr(PyObject *unself, PyObject *args)
   return Py_None;
 }
 
-static void
-destroy_rcache(void *cobj, void *desc)
-{
-  krb5_rc_close((krb5_context)desc, (krb5_rcache)cobj);
-}
-
 static PyObject*
-RCache_init(PyObject *notself, PyObject *args, PyObject *kw)
+RCache_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   PyObject *self;
-  PyObject *cobj, *conobj = NULL, *new_rc = NULL, *new_rc_name = NULL, *do_recover = NULL;
+  PyObject *cobj, *conobj = NULL, *new_rc_name = NULL;
   krb5_context ctx;
   krb5_rcache rcache;
   krb5_error_code rc;
-  int is_dfl = 0;
+  krb5_data rcname;
 
   if(!PyArg_ParseTuple(args, "O:__init__", &self))
     return NULL;
@@ -2449,8 +2412,6 @@ RCache_init(PyObject *notself, PyObject *args, PyObject *kw)
     {
       conobj = PyDict_GetItemString(kw, "context");
       new_rc_name = PyDict_GetItemString(kw, "name");
-      new_rc = PyDict_GetItemString(kw, "rcache");
-      do_recover = PyDict_GetItemString(kw, "recover");
     }
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
@@ -2459,22 +2420,18 @@ RCache_init(PyObject *notself, PyObject *args, PyObject *kw)
   assert(cobj);
   ctx = PyCObject_AsVoidPtr(cobj);
 
-  if(new_rc)
+  if(new_rc_name)
     {
-      rc = 0;
-      rcache = PyCObject_AsVoidPtr(new_rc);
-    }
-  else if(new_rc_name)
-    {
-      char *ccname = PyString_AsString(new_rc_name);
-      assert(ccname);
-      rc = krb5_rc_resolve_full(ctx, &rcache, ccname);
+      rcname.data = PyString_AsString(new_rc_name);
+      rcname.length = PyString_Size(new_rc_name);
     }
   else
     {
-      rc = krb5_rc_default(ctx, &rcache);
-      is_dfl = 1;
+      rcname.data = "default";
+      rcname.length = 7;
     }
+  
+  rc = krb5_get_server_rcache(ctx, &rcname, &rcache);
 
   if(rc)
     {
@@ -2483,13 +2440,9 @@ RCache_init(PyObject *notself, PyObject *args, PyObject *kw)
     }
   else
     {
-      cobj = PyCObject_FromVoidPtrAndDesc(rcache, ctx, destroy_rcache);
+      cobj = PyCObject_FromVoidPtr(rcache, NULL);
       PyObject_SetAttrString(self, "_rcache", cobj);
       PyObject_SetAttrString(self, "context", conobj);
-      if(do_recover)
-	rc = krb5_rc_recover(ctx, rcache);
-      if(rc || !do_recover)
-	krb5_rc_initialize(ctx, rcache, 24000);
     }
 
   Py_INCREF(Py_None);
@@ -2497,7 +2450,7 @@ RCache_init(PyObject *notself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-RCache_eq(PyObject *unself, PyObject *args)
+RCache_eq(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp, *other;
   krb5_context ctx = NULL;
@@ -2531,17 +2484,17 @@ RCache_eq(PyObject *unself, PyObject *args)
 }
 
 static PyMethodDef rcache_methods[] = {
-  {"__init__", (PyCFunction)RCache_init, METH_VARARGS|METH_KEYWORDS},
-  {"__eq__", (PyCFunction)RCache_eq, METH_VARARGS},
-  {NULL, NULL}
+  {"__init__", (PyCFunction)RCache_init, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"__eq__", (PyCFunction)RCache_eq, METH_VARARGS, NULL},
+  {NULL, NULL, 0, NULL}
 };
 
 static PyObject *
 pk_rcache_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", RCache_getattr, METH_VARARGS},
-    setattr = {"__setattr__", RCache_setattr, METH_VARARGS};
+  static PyMethodDef getattr = {"__getattr__", RCache_getattr, METH_VARARGS, NULL},
+    setattr = {"__setattr__", RCache_setattr, METH_VARARGS, NULL};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -2568,7 +2521,7 @@ pk_rcache_make_class(PyObject *module)
 
 /************************* keytab **********************************/
 static PyObject*
-Keytab_getattr(PyObject *unself, PyObject *args)
+Keytab_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *retval = NULL, *self, *tmp;
@@ -2613,7 +2566,7 @@ Keytab_getattr(PyObject *unself, PyObject *args)
 }
 
 static PyObject*
-Keytab_setattr(PyObject *unself, PyObject *args)
+Keytab_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
   char *name;
   PyObject *self, *value, *nameo, *tmp;
@@ -2663,7 +2616,7 @@ destroy_keytab(void *cobj, void *desc)
 }
 
 static PyObject*
-Keytab_init(PyObject *notself, PyObject *args, PyObject *kw)
+Keytab_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   PyObject *self;
   PyObject *cobj, *conobj = NULL, *new_rc = NULL;
@@ -2716,7 +2669,7 @@ Keytab_init(PyObject *notself, PyObject *args, PyObject *kw)
 }
 
 static PyObject*
-Keytab_eq(PyObject *unself, PyObject *args)
+Keytab_eq(PyObject *unself __UNUSED, PyObject *args)
 {
   PyObject *self, *tmp, *other;
   krb5_context ctx = NULL;
@@ -2750,17 +2703,17 @@ Keytab_eq(PyObject *unself, PyObject *args)
 }
 
 static PyMethodDef keytab_methods[] = {
-  {"__init__", (PyCFunction)Keytab_init, METH_VARARGS|METH_KEYWORDS},
-  {"__eq__", (PyCFunction)Keytab_eq, METH_VARARGS},
-  {NULL, NULL}
+  {"__init__", (PyCFunction)Keytab_init, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"__eq__", (PyCFunction)Keytab_eq, METH_VARARGS, NULL},
+  {NULL, NULL, 0, NULL}
 };
 
 static PyObject *
 pk_keytab_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", Keytab_getattr, METH_VARARGS},
-    setattr = {"__setattr__", Keytab_setattr, METH_VARARGS};
+  static PyMethodDef getattr = {"__getattr__", Keytab_getattr, METH_VARARGS, NULL},
+    setattr = {"__setattr__", Keytab_setattr, METH_VARARGS, NULL};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -2787,7 +2740,7 @@ pk_keytab_make_class(PyObject *module)
 
 /****** main module ********/
 static PyObject *
-pk_default_context(PyObject *self, PyObject *unused_args)
+pk_default_context(PyObject *unself __UNUSED, PyObject *unused_args __UNUSED)
 {
   PyObject *retval = NULL;
 
@@ -2812,8 +2765,8 @@ pk_default_context(PyObject *self, PyObject *unused_args)
 }
 
 static PyMethodDef krb5_functions[] = {
-  {"default_context", pk_default_context, METH_VARARGS},
-  {NULL, NULL}
+  {"default_context", pk_default_context, METH_VARARGS, NULL},
+  {NULL, NULL, 0, NULL}
 };
 
 void
