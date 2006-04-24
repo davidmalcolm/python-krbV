@@ -53,9 +53,9 @@ for I in .; do
 	(cd $I
 	libtoolize --force
 	aclocal -I $TOPDIR
+	autoheader
 	automake --add-missing
 	autoconf
-	autoheader
 	)
 done
 
