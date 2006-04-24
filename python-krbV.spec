@@ -1,8 +1,8 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(plat_specific=True)")} 
 
 Name: python-krbV
-Version: %(/bin/awk '/AM_INIT_AUTOMAKE/ { print substr($2, 0, length($2)-1) }' configure.in)
-Release: 3%{?dist}
+Version: 1.0.12
+Release: 1%{?dist}
 Summary: Python extension module for Kerberos 5
 
 Group: Development/Languages
@@ -47,6 +47,9 @@ export CFLAGS="%{optflags} -Wextra"
 %{python_sitelib}/krbVmodule.so
 
 %changelog
+* Mon Apr 24 2006 Michael Bonnet <mikeb@redhat.com> - 1.0.12
+- bump version number due to API changes
+
 * Fri Mar 24 2006 Mike Bonnet <mikeb@redhat.com>
 - fix typo in error definition
 - change the return value of recvauth() from ac to (ac, princ), where princ is the principal sent by sendauth()
