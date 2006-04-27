@@ -2,13 +2,14 @@
 
 Name: python-krbV
 Version: 1.0.12
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: Python extension module for Kerberos 5
 
 Group: Development/Languages
 License: LGPL
 
-Source: python-krbV-%{version}.tar.gz
+URL: http://people.redhat.com/mikeb/python-krbV
+Source0: http://people.redhat.com/mikeb/python-krbV/python-krbV-%{version}.tar.gz
 
 Buildroot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -18,7 +19,6 @@ BuildRequires: krb5-devel >= 1.2.2
 BuildRequires: /bin/awk
 
 Requires: python-abi = %(%{__python} -c "import sys ; print sys.version[:3]")
-Requires: krb5-libs >= 1.2.2
 
 %description
 python-krbV allows python programs to use Kerberos 5 authentication/security.
@@ -43,11 +43,18 @@ export CFLAGS="%{optflags} -Wextra"
 
 %files
 %defattr(-,root,root,-)
-%doc README krbV-code-snippets.py
+%doc README COPYING krbV-code-snippets.py
 %{python_sitelib}/krbVmodule.so
 
 %changelog
-* Mon Apr 24 2006 Michael Bonnet <mikeb@redhat.com> - 1.0.12
+* Thu Apr 27 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.12-2
+- configure.in: parse version number out of spec file
+- add URL tag
+- add LGPL text
+- remove Requires: krb5-libs, let rpm pick up library dependencies
+- bump revision
+
+* Mon Apr 24 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.12-1
 - bump version number due to API changes
 
 * Fri Mar 24 2006 Mike Bonnet <mikeb@redhat.com>

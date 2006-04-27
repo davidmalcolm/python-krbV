@@ -1,6 +1,6 @@
 AC_INIT
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(python-krbV, 1.0.12)
+AM_INIT_AUTOMAKE(python-krbV, $(/bin/awk '/^Version:/ { print $2 }' python-krbV.spec))
 
 AC_PREFIX_DEFAULT(/usr)
 
