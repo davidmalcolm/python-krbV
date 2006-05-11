@@ -1047,6 +1047,52 @@ addr_to_str(krb5_address *kaddr)
     }
 }
 
+typedef struct addr_storage
+{
+  struct in_addr ip4;
+  struct in6_addr ip6;
+} addr_storage;
+
+/* Convert a string representation of an address to a krb5_address */
+static int
+str_to_addr(const char* address, krb5_address *krb5addr, addr_storage *as)
+{
+  struct in_addr ipv4addr;
+  struct in6_addr ipv6addr;
+
+  /* First try ipv4, and if that fails, try ipv6 */
+  if (inet_pton(AF_INET, address, &ipv4addr)) {
+    krb5addr->addrtype = ADDRTYPE_INET;
+    as->ip4 = ipv4addr;
+    krb5addr->length = sizeof(as->ip4.s_addr);
+    krb5addr->contents = (krb5_octet *) &(as->ip4.s_addr);
+    return 1;
+  } else if (inet_pton(AF_INET6, address, &ipv6addr)) {
+    krb5addr->addrtype = ADDRTYPE_INET6;
+    as->ip6 = ipv6addr;
+    krb5addr->length = sizeof(as->ip6.s6_addr);
+    krb5addr->contents = (krb5_octet *) &(as->ip6.s6_addr);
+    return 1;
+  }
+
+  return 0;
+}
+
+/* Convert an unsigned short port to a krb5_address */
+static int
+port_to_addr(unsigned short port, krb5_address *krb5addr)
+{
+  /* If port == 0, don't set anything and return 0 */
+  if (port > 0) {
+    krb5addr->addrtype = ADDRTYPE_IPPORT;
+    krb5addr->length = sizeof(port);
+    krb5addr->contents = (krb5_octet *) &port;
+    return 1;
+  }
+
+  return 0;
+}
+
 /*********************** AuthContext **********************/
 static PyObject*
 AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
@@ -1152,7 +1198,7 @@ AuthContext_setattr(PyObject *unself __UNUSED, PyObject *args)
   krb5_context ctx = NULL;
   krb5_auth_context ac = NULL;
   krb5_error_code rc;
-
+  
   if(!PyArg_ParseTuple(args, "OO!O:__setattr__", &self, &PyString_Type, &nameo, &value))
     return NULL;
   inst = (PyInstanceObject *)self;
@@ -1213,10 +1259,56 @@ AuthContext_setattr(PyObject *unself __UNUSED, PyObject *args)
       if(rc)
 	return pk_error(rc);
     }
-  else if(!strcmp(name, "addrs")
-	  || (!strcmp(name, "context") && ctx)
-	  || (!strcmp(name, "_ac") && ac)
-	  )
+  else if(!strcmp(name, "addrs"))
+    {
+      krb5_address localaddr, remoteaddr, localport, remoteport;
+      krb5_address *la = NULL, *ra = NULL, *lp = NULL, *rp = NULL;
+      unsigned int lport, rport;
+      char *laddr, *raddr;
+      addr_storage local_as, remote_as;
+    
+      if(!PyArg_ParseTuple(value, "zIzI", &laddr, &lport, &raddr, &rport))
+        return NULL;
+      
+      if(laddr) {
+        if (str_to_addr(laddr, &localaddr, &local_as)) {
+          la = &localaddr;
+        } else { 
+          PyErr_Format(PyExc_AttributeError, "invalid address: %.400s", laddr);
+          return NULL;         
+        }
+      }
+
+      if(raddr) {
+        if (str_to_addr(raddr, &remoteaddr, &remote_as)) {
+          ra = &remoteaddr;
+        } else {
+          PyErr_Format(PyExc_AttributeError, "invalid address: %.400s", raddr);
+          return NULL;          
+        }
+      }
+
+      if(lport > 65535 || rport > 65535) {
+        PyErr_Format(PyExc_AttributeError, "port numbers cannot be greater than 65535");
+        return NULL;
+      }
+
+      if (port_to_addr((unsigned short) lport, &localport))
+        lp = &localport;
+        
+      if (port_to_addr((unsigned short) rport, &remoteport))
+        rp = &remoteport;
+      
+      rc = krb5_auth_con_setaddrs(ctx, ac, la, ra);
+      if(rc)
+        return pk_error(rc);
+
+      rc = krb5_auth_con_setports(ctx, ac, lp, rp);
+      if(rc)
+        return pk_error(rc);
+    }
+  else if((!strcmp(name, "context") && ctx) || 
+          (!strcmp(name, "_ac") && ac))
     {
       PyErr_Format(PyExc_AttributeError, "You cannot set attribute '%.400s'", name);
       return NULL;
