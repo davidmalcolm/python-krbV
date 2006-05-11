@@ -1,8 +1,8 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(plat_specific=True)")} 
 
 Name: python-krbV
-Version: 1.0.12
-Release: 2%{?dist}
+Version: 1.0.13
+Release: 1%{?dist}
 Summary: Python extension module for Kerberos 5
 
 Group: Development/Languages
@@ -47,6 +47,9 @@ export CFLAGS="%{optflags} -Wextra"
 %{python_sitelib}/krbVmodule.so
 
 %changelog
+* Wed May 10 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-1
+- AuthContext.addrs can now be set manually, rather than calling genaddrs()
+
 * Thu Apr 27 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.12-2
 - configure.in: parse version number out of spec file
 - add URL tag
