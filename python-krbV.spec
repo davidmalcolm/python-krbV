@@ -51,6 +51,9 @@ export CFLAGS="%{optflags} -Wextra"
 * Wed May 10 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-1
 - AuthContext.addrs can now be set manually, rather than calling genaddrs()
 
+* Sun May 21 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.12-3
+- use macros consistently
+
 * Thu Apr 27 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.12-2
 - configure.in: parse version number out of spec file
 - add URL tag
