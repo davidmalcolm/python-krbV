@@ -2,18 +2,17 @@
 
 Name: python-krbV
 Version: 1.0.13
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: Python extension module for Kerberos 5
 
 Group: Development/Languages
 License: LGPL
 
 URL: http://people.redhat.com/mikeb/python-krbV
-Source0: http://people.redhat.com/mikeb/python-krbV/python-krbV-%{version}.tar.gz
+Source: http://people.redhat.com/mikeb/python-krbV/python-krbV-%{version}.tar.gz
 
 Buildroot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires: python
 BuildRequires: python-devel
 BuildRequires: krb5-devel >= 1.2.2
 BuildRequires: /bin/awk
@@ -24,22 +23,21 @@ Requires: python-abi = %(%{__python} -c "import sys ; print sys.version[:3]")
 python-krbV allows python programs to use Kerberos 5 authentication/security.
 
 %prep
-%setup -q -n python-krbV-%{version}
+%setup -q
 
 %build
-export LIBNAME=%{_lib}
+export LIBNAME="%{_lib}"
 export CFLAGS="%{optflags} -Wextra"
 %configure
 %{__make} %{?_smp_mflags}
 
 %install
-%{__rm} -rf $RPM_BUILD_ROOT
-%{__mkdir_p} %{python_sitelib}
+%{__rm} -rf %{buildroot}
 %makeinstall
-%{__rm} -f $RPM_BUILD_ROOT%{python_sitelib}/*.la
+%{__rm} -f %{buildroot}/%{python_sitelib}/*.la
 
 %clean
-%{__rm} -rf $RPM_BUILD_ROOT
+%{__rm} -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
@@ -47,6 +45,9 @@ export CFLAGS="%{optflags} -Wextra"
 %{python_sitelib}/krbVmodule.so
 
 %changelog
+* Sun May 21 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-2
+- spec file cleanup
+
 * Wed May 10 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-1
 - AuthContext.addrs can now be set manually, rather than calling genaddrs()
 
