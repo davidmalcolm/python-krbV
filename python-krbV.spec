@@ -48,7 +48,7 @@ export CFLAGS="%{optflags} -Wextra"
 * Sun May 21 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-2
 - spec file cleanup
 
-* Wed May 10 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-1
+* Wed May 21 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-1
 - AuthContext.addrs can now be set manually, rather than calling genaddrs()
 
 * Sun May 21 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.12-3
