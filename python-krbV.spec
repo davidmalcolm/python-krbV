@@ -2,7 +2,7 @@
 
 Name: python-krbV
 Version: 1.0.13
-Release: 3%{?dist}
+Release: 4%{?dist}
 Summary: Python extension module for Kerberos 5
 
 Group: Development/Languages
@@ -45,6 +45,9 @@ export CFLAGS="%{optflags} -Wextra"
 %{python_sitelib}/krbVmodule.so
 
 %changelog
+* Wed Sep 13 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-4
+- support building against krb-1.5, where the headers have been moved to /usr/include/krb5
+
 * Mon Sep 11 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-3
 - rebuild for FC6
 

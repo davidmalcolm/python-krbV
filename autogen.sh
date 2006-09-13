@@ -48,21 +48,21 @@ if test -z "$*"; then
 fi
 
 TOPDIR=`pwd`
-for I in .; do
-	echo "processing $I"
-	(cd $I
-	libtoolize --force
-	aclocal -I $TOPDIR
-	autoheader
-	automake --add-missing
-	autoconf
-	)
-done
+
+libtoolize --force
+aclocal -I $TOPDIR
+autoheader
+automake --add-missing
+autoconf
 
 cd $ORIGDIR
 
 echo "Running $srcdir/configure --enable-maintainer-mode" "$@"
-$srcdir/configure --enable-maintainer-mode "$@"
+$srcdir/configure --enable-maintainer-mode "$@" || DIE=1
+
+if test "$DIE" -eq 1; then
+	exit 1
+fi
 
 echo 
 echo "Now type 'make' to compile krb5module."
