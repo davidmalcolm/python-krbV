@@ -36,6 +36,22 @@ static void destroy_principal(void *cobj, void *desc);
 
 static PyObject *krb5_module, *context_class, *auth_context_class, *principal_class, *ccache_class, *rcache_class, *keytab_class;
 
+PyDoc_STRVAR(Context_init__doc__,
+"__init__() -> KrbV.Context                                                  \n\
+                                                                             \n\
+:Summary : Create a Krb Context object.                                      \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+The KrbV.Context structure is designed to hold all per-thread state.         \n\
+All global variables that are thread-specific are stored in this structure,  \n\
+including default encryption-types, credentials-cache (ticket file), and     \n\
+default realms.  The internals of the structure should never be accessed     \n\
+directly, functions exist for extracting information.                        \n\
+:Return value :                                                              \n\
+    __init__() returns a Context object.                                     \n\
+");
+
 static PyObject*
 Context_init(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -59,8 +75,22 @@ Context_init(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Context.__init__() */
 
+PyDoc_STRVAR(Context_getattr__doc__,
+"__getattr__(string) -> PyObject                                             \n\
+                                                                             \n\
+:Summary : Retrieve a KrbV.Context member object by name.                    \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+__getattr__() supports only the following Object-members:                    \n\
+    * _ctx :           Sort of a copy() method?                              \n\
+    * default_realm  : The default realm is extracted from the krb.conf file \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    This method's retval-type corresponds to the member-name parameter.      \n\
+");
 static PyObject*
 Context_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -101,8 +131,21 @@ Context_getattr(PyObject *unself __UNUSED, PyObject *args)
     }
 
   return retval;
-}
+} /* KrbV.Context.__getattr__() */
 
+PyDoc_STRVAR(Context_setattr__doc__,
+"__setattr__(string, value-object) -> 'None'                                    \n\
+                                                                                \n\
+:Summary : Set a KrbV.Context member object's value, by name.                   \n\
+           Internal function, do not use.                                       \n\
+                                                                                \n\
+:Purpose :                                                                      \n\
+__setattr__() supports only the following Context-members:                       \n\
+    * default_realm  : Set the default realm.                                   \n\
+                                                                                \n\
+:Return value :                                                                 \n\
+    'None', or NULL.                                                            \n\
+");
 static PyObject*
 Context_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -146,7 +189,37 @@ Context_setattr(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Context.__setattr__() */
+
+PyDoc_STRVAR(Context_cc_default__doc__,
+"default_ccache(context) -> CCache object                                    \n\
+                                                                             \n\
+:Summary : Retrieve the default credentials-cache object from the current    \n\
+           Kerberos context, or from the ticket-file, if necessary.          \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    context : KrbV.Context                                                   \n\
+        The current Kerberos context holds the host's kerberos config-data,  \n\
+        including default encryption-types, credentials-cache (ticket file), \n\
+        and default realms.                                                  \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    default_ccache() loads the default ticket-file's contents into a CCache  \n\
+    object.  The default ticket-file's pathname is part of the krb context.  \n\
+    BTW, only kerberos clients have ticket files;  this is where a client's  \n\
+    short-lived tickets and session keys stay, while a user is logged-in.    \n\
+                                                                             \n\
+:Action and side-effects :                                                   \n\
+    krb_context.default_ccache() calls CCache.__init__(context=krb_context), \n\
+    which in turn calls the krblib C routine krb5_cc_default().              \n\
+    krb5_cc_default() looks in the krb context for the default filename of   \n\
+    the ticket file, and then reads the ticket-file's contents into a        \n\
+    credentials-cache (a C data-structure),  Finally, default_ccache()       \n\
+    converts the C-struct credentials-cache to a CCache object.              \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    A CCache object, containing the user's tickets and session-keys.         \n\
+");
 
 static PyObject*
 Context_cc_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
@@ -180,8 +253,34 @@ Context_cc_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   }
 
   return retval;
-}
+} /* KrbV.Context.default_ccache() */
 
+PyDoc_STRVAR(Context_rc_default__doc__,
+"default_rcache(context) -> KrbV.Context.RCache object                       \n\
+                                                                             \n\
+:Summary :  Retrieve the default replay-cache object from                    \n\
+            the current Kerberos context.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    context : KrbV.Context                                                   \n\
+        The current Kerberos context holds the host's kerberos config-data,  \n\
+        including default encryption-types, credentials-cache (ticket file), \n\
+        and default realms.                                                  \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    default_rcache() loads the default replay-cache into an RCache object.   \n\
+    Only kerberized application-servers have replay caches.                  \n\
+                                                                             \n\
+:Action and side-effects :                                                   \n\
+    krb_context.default_rcache() calls RCache.__init__(context=krb_context), \n\
+    which in turn calls the krblib C routine krb5_rc_default().              \n\
+    krb5_rc_default() looks in the krb context for the default replay cache, \n\
+    and default_rcache() converts the C-struct replay-cache to an RCache     \n\
+    object.                                                                  \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    An RCache object, containing the user's tickets and session-keys.        \n\
+");
 static PyObject*
 Context_rc_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -217,8 +316,37 @@ Context_rc_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   }
 
   return retval;
-}
+} /* KrbV.Context.default_rcache() */
 
+PyDoc_STRVAR(Context_kt_default__doc__,
+"default_keytab(context) -> KrbV.Context.RCache object                       \n\
+                                                                             \n\
+:Summary : Retrieve the default key-table object from the current,           \n\
+           Kerberos context or from the default keytab-file, if necessary.   \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    context : KrbV.Context                                                   \n\
+        The current Kerberos context holds the host's kerberos config-data,  \n\
+        including default encryption-types, credentials-cache (ticket file), \n\
+        and default realms.                                                  \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    default_keytab() loads the default keytab-file's contents into a Keytab  \n\
+    object.  The default keytab-file's pathname is part of the krb context.  \n\
+    Only kerberos servers have keytab files;  this is where a server's       \n\
+    long-lived secret keys stay.  The keytab in not encrypted, so that the   \n\
+    server can cold-start without a human operator's help.                   \n\
+                                                                             \n\
+:Action and side-effects :                                                   \n\
+    KrbV.Context.default_keytab() calls RCache.__init__(context=krb_context),\n\
+    which in turn calls the krblib C routine krb5_rc_default().              \n\
+    krb5_rc_default() looks in the krb context for the default replay cache, \n\
+    and default_keytab() converts the C-struct replay-cache to an RCache     \n\
+    object.                                                                  \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    An RCache object, containing the user's tickets and session-keys.        \n\
+");
 static PyObject*
 Context_kt_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -254,7 +382,114 @@ Context_kt_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   }
 
   return retval;
-}
+} /* KrbV.Context.default_keytab() */
+
+PyDoc_STRVAR(Creds_tuple__doc__,
+"Creds_tuple object                                                          \n\
+                                                                             \n\
+:Purpose :  A Creds_tuple holds a single entry from a CCache.                \n\
+            The main items are the client's & server's names, the            \n\
+            user's tickets, the session key, and the ticket lifetime.        \n\
+            TBD:  This object isn't yet set up as a Python class.            \n\
+                                                                             \n\
+:Contents :                                                                  \n\
+    <client>          Principal : Client's name, eg, 'JohnDoe/EXAMPLE.COM'   \n\
+    <server>          Principal : Server's name, eg, 'NFS/FILER_1.EXAMPLE.COM'\n\
+    <keyblock>        tuple                                                  \n\
+       <enctype>      integer        :                                       \n\
+       <contents>     string         :                                       \n\
+    <times>           tuple                                                  \n\
+       <authtime>     integer        :                                       \n\
+       <starttime>    integer        :                                       \n\
+       <endtime>      integer        :                                       \n\
+       <renew_till>   integer        :                                       \n\
+    <is_skey>                                                                \n\
+    <ticket_flags>    integer                                                \n\
+    <addrlist>        tuple ((type, string)...)                              \n\
+    <ticket.data>     string                                                 \n\
+    <2nd_ticket.data> string                                                 \n\
+    <authdata_list>   tuple ((type, string)...)                              \n\
+");
+
+PyDoc_STRVAR(Context_mk_req__doc__,
+"mk_req(in_data, options, server, keytab, auth_context) ->                   \n\
+       (auth_context, int, tkt-cipher [,tkt-plain])                          \n\
+                                                                             \n\
+:Parameters:                                                                 \n\
+    server krbV.Principal :                                                  \n\
+         The server name. The server principal in the AP_REQ must            \n\
+         be the same as the principal specified by this parameter.           \n\
+    data : str (optional)                                                    \n\
+         A small buffer containing a message to send in the authenticator.   \n\
+         If data is 'None', then mk_req() will use the string 'BLANK' as the \n\
+         message to be protected.                                            \n\
+         BUG:  This should be a msg-checksum, not the message itself.        \n\
+    options : int (optional)                                                 \n\
+         KRB_AP_REQ flags.  Valid flag values are:                           \n\
+            * AP_OPTS_MUTUAL_REQUIRED :                                      \n\
+                The client requires mutual authentication, ie, kerberized    \n\
+                proof of the server's identity.                              \n\
+                Normally, you should always use this flag, but only for      \n\
+                the first send_auth() call on a connection.                  \n\
+            * AP_OPTS_USE_SESSION_KEY :                                      \n\
+                Specific for user-to-user (ie, peer-to-peer) connections.    \n\
+                Not used for most client-server applications.                \n\
+            * AP_OPTS_USE_SUBKEY :                                           \n\
+                The application client or server can choose a sub-session    \n\
+                key, but this usually isn't necessary.                       \n\
+         These KRB_AP_REQ flags can be OR'ed together, as needed.            \n\
+         For details about the use of user-to-user and subkeys, see RFC 4120.\n\
+         If the options are not needed, specify 'None' for this parameter.   \n\
+    client : krbV.Principal (optional)                                       \n\
+         The client name.                                                    \n\
+    ccache : KrbV.CCache (optional)                                          \n\
+    auth_context : KrbV.AuthContext                                          \n\
+         Info about the kerberos-session, especially:                        \n\
+            * the client's principal-name, and                               \n\
+            * any session-key the server shares with the client.             \n\
+    creds tuple :                                                            \n\
+         BUG: this parameter should be a Creds object, not a tuple.          \n\
+         For details of the creds tuple's structure, see the doc-string for  \n\
+         'Creds_tuple', elsewhere in this document.                          \n\
+                                                                             \n\
+:Summary: Prepare a Krb 'application request' message.                       \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+An application-client calls mk_req() to prepare a client's authenticated     \n\
+request for service (AP_REQ).  The client must then explicitly send the      \n\
+AP_REQ message to the application-server; mk_req() doesn't send the message. \n\
+The client's AP_REQ message contains the client's encrypted service-ticket   \n\
+and an encrypted timestamp (aka 'authenticator').                            \n\
+The client calls mk_req() as the first step in an authenticated handshake.   \n\
+                                                                             \n\
+:Action & side-effects :                                                     \n\
+mk_req() doesn't actually send the AP_REQ message across the network;        \n\
+mk_req() only encodes and encrypts the AP_REQ message.                       \n\
+However, mk_req() can ask the TGS for application tickets, if necessary.     \n\
+If you call mk_req() with a client-principal object (so that creds=='None'), \n\
+mk_req() will use the client & service principals to get and use a service-  \n\
+ticket, with which to construct the AP_REQ message.  In case mk_req() does   \n\
+request a new ticket, you should refresh your ccache parameter before calling\n\
+mk_req() again, so that your next mk_req() call can use the new ticket.      \n\
+                                                                             \n\
+The caller must supply either a client parameter or a creds parameter.       \n\
+If you call mk_req() with both a client-principal and credentials, mk_req()  \n\
+will use the credentials' client-principal as the client's name.             \n\
+                                                                             \n\
+:Return value:                                                               \n\
+    mk_req() returns a tuple of 2 elements:                                  \n\
+                                                                             \n\
+    0. An AuthContext.  The input authentication context, or a new           \n\
+       AuthContext if the input AuthContext value was 'None'.                \n\
+       In either case, the retval's AuthContext contains any new             \n\
+       application that mk_req() may have requested from the TGS.            \n\
+    1. An output string, containing the new AP_REQ message.  The caller's    \n\
+       code must transmit this AP_REQ message to the application-server.     \n\
+                                                                             \n\
+:See also:                                                                   \n\
+KrbV.Context     methods : rd_req(),  mk_rep(), rd_rep();                    \n\
+KrbV.AuthContext methods : mk_priv(), rd_priv()                              \n\
+");
 
 static PyObject*
 Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
@@ -399,6 +634,10 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
     {
       PyObject *subargs, *mykw = NULL, *otmp;
 
+      /* Construct and evaluate an AuthContext.__init__() call,
+       * which makes a copy of the AuthContext input parameter,
+       * as we've modified it:
+       */
       subargs = Py_BuildValue("()");
       mykw = PyDict_New();
       PyDict_SetItemString(mykw, "context", self);
@@ -409,12 +648,13 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
       Py_DECREF(subargs);
       Py_XDECREF(mykw);
     }
+  /* mk_req()'s retval is a 2-elt tuple:  (AuthContext, string) */
   PyTuple_SetItem(retval, 0, auth_context);
   PyTuple_SetItem(retval, 1, PyString_FromStringAndSize(outbuf.data, outbuf.length));
   krb5_free_data_contents(kctx, &outbuf);
 
   return retval;
-}
+} /* KrbV.Context.mk_req() */
 
 #ifdef Py_DEBUG
 static int
@@ -543,6 +783,81 @@ make_address_list(krb5_address **caddrs)
   return retval;
 }
 
+/* ============================ Class Methods =============================== */
+
+PyDoc_STRVAR(Context_rd_req__doc__,
+"rd_req(in_data, options, server, keytab, auth_context) ->                   \n\
+       (auth_context, int, tkt-cipher [,tkt-plain])                          \n\
+                                                                             \n\
+:Parameters:                                                                 \n\
+    in_data : buffer                                                         \n\
+         The buffer containing the AP_REQ message.                           \n\
+    options : int                                                            \n\
+         The options from the AP_REQ message, as prepared by mk_req().       \n\
+         If the options are not needed, specify 'None' for this parameter.   \n\
+         BUG:  This should be an Output parameter, and the rd_req() method   \n\
+         ignores the input options.  rd_req() does return the output options \n\
+         correctly, in the retval tuple.                                     \n\
+    server : krbV.Principal                                                  \n\
+         The server name. The server principal in the AP_REQ must            \n\
+         be the same as the principal specified by this parameter.           \n\
+         Specify 'None' if any server principal is acceptable.               \n\
+    keytab : KrbV.keytab                                                     \n\
+         The key table that contains the server key. The default key table   \n\
+         is used if 'None' is specified for this parameter.                  \n\
+    auth_context : KrbV.auth_context                                         \n\
+         info about the kerberos-session, especially:                        \n\
+            * the server's principal-name,                                   \n\
+            * any session-key the server shares with the client,             \n\
+            * the session's replay-cache.                                    \n\
+                                                                             \n\
+:Summary: Parse a Krb 'application request' message.                         \n\
+                                                                           \n\
+:Purpose :                                                                 \n\
+An application server calls rd_req() in order to authenticate a client's   \n\
+request for service (AP_REQ).  The client's AP_REQ message includes the    \n\
+client's encrypted service-ticket and an encrypted timestamp (aka          \n\
+'authenticator'). rd_req() decrypts both of these.                         \n\
+The server calls rd_req() as the 2nd step in an authenticated handshake.   \n\
+                                                                           \n\
+:Action & side-effects :                                                   \n\
+rd_req() doesn't actually read the AP_REQ message from the network;        \n\
+rd_req() only decrypts, decodes, and interprets the AP_REQ message.        \n\
+rd_req() decrypts the AP_REQ message, checks the message for freshness,    \n\
+and checks to make sure that the encrypted client-name matches the client  \n\
+who requested service.                                                     \n\
+rd_req() populates an AuthContext for this session, with the following:    \n\
+    * The client's name (from the decrypted ticket);                       \n\
+    * The client's session-key (from the decrypted ticket);                \n\
+    * The AP_REQ message's timestamp (from the decrypted authenticator);   \n\
+    * A handle for a replay cache (which holds this first authenticator).  \n\
+                                                                           \n\
+:Return value:                                                             \n\
+    rd_req() returns a tuple of 3 or 4 elements (usually 4):               \n\
+                                                                           \n\
+    0. An auth context, including the AP_REQ's decrypted authenticator.    \n\
+       This is the input authentication context, or a new AuthContext      \n\
+       object if the input AuthContext value was 'None'.                   \n\
+    1. The client request's stipulated security options.                   \n\
+       For example, the client sends the flag krbV.AP_OPTS_MUTUAL_REQUIRED \n\
+       in order to tell the server to authenticate itself in return.       \n\
+    2. The server's Principal object,                                      \n\
+    3. A tuple, containing the plaintext of the ticket that mk_req() sent: \n\
+        a. ticket flags,                                                   \n\
+        b. session-key, including the enctype,                             \n\
+        c. the authenticated name of the client who  sent  the  AP_REQ,    \n\
+	d. list of transited realms (if this was an inter-realm AP_REQ),   \n\
+        e. ticket-validity times:  auth, start, end, renew_till,           \n\
+        f. array of pointers to addresses,                                 \n\
+        g. authorization data.                                             \n\
+Whew!                                                                      \n\
+                                                                           \n\
+:See also:                                                                 \n\
+KrbV.Context     methods : mk_req(),  mk_rep(), rd_rep();                  \n\
+KrbV.AuthContext methods : mk_priv(), rd_priv()                            \n\
+The krb5_rd_req() man page fully explains rd_req()'s actions & results.    \n\
+");
+
 static PyObject*
 Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
 {
@@ -661,7 +976,7 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
   assert(!check_obj(args));
 
   return retval;
-}
+} /* KrbV.Context.rd_req() */
 
 static int
 obj_to_fd(PyObject *fd_obj)
@@ -676,6 +991,75 @@ obj_to_fd(PyObject *fd_obj)
     return -1;
   return PyInt_AsLong(fd_obj);
 }
+
+PyDoc_STRVAR(Context_sendauth__doc__,
+"Context_sendauth(fd, version, options, server, client, ccache, data) ->     \n\
+auth_context                                                                 \n\
+                                                                             \n\
+:Summary : Offer and complete an authenticated message-handshake and back.   \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    fd : file descriptor                                                     \n\
+        a network socket (TCP only, not UDP)                                 \n\
+    version : str                                                            \n\
+        the client's version of the application protocol.                    \n\
+    options : int (optional)                                                 \n\
+        KRB_AP_REQ flags.  Valid flag values are:                            \n\
+            * AP_OPTS_MUTUAL_REQUIRED :                                      \n\
+                The client requires mutual authentication, ie, kerberized    \n\
+                proof of the server's identity.                              \n\
+                Normally, you need to use this flag, but only for            \n\
+                the first send_auth() call on a connection.                  \n\
+            * AP_OPTS_USE_SESSION_KEY :                                      \n\
+                Specific for user-to-user (ie, peer-to-peer) connections.    \n\
+                Not useful for most client-server applications.              \n\
+            * AP_OPTS_USE_SUBKEY :                                           \n\
+                The application client or server can choose a sub-session    \n\
+                key, but this usually isn't necessary.                       \n\
+        These KRB_AP_REQ flags can be OR'ed together, as needed.             \n\
+        For details about the use of user-to-user and subkeys, see RFC 4120. \n\
+    server : KrbV.Principal                                                  \n\
+        The application server's principal/instance name.                    \n\
+    client : KrbV.Principal (optional)                                       \n\
+        The application client's principal/instance name.                    \n\
+    ccache : KrbV.CCache (optional)                                          \n\
+        The client's credentials cache.                                      \n\
+    data : str                                                               \n\
+        A plaintext message to be sent in authenticated form.                \n\
+    The first two arguments are positional, and the rest are all             \n\
+    keyword-parameters.                                                      \n\
+                                                                             \n\
+:Purpose :                                                                  \n\
+    sendauth() is a high-level routine that both sends a client's AP_REQ    \n\
+    service-request _and_ receives the server's corresponding AP_REP reply. \n\
+    Further, sendauth() will automatically get service-tickets if necessary.\n\
+    No application-specific data get exchanged, except for version numbers. \n\
+    Note that only application-clients can call sendauth;  the              \n\
+    corresponding server-side method is recvauth().                         \n\
+    The handshake's outcome is that the client & server both get complete   \n\
+    AuthContext objects, which they then can use to exchange encrypted      \n\
+    application-traffic via the AuthContext methods mk_priv() & rd_priv().  \n\
+                                                                            \n\
+:Action & side-effects :                                                    \n\
+    A sendauth()/recvauth() handshake seeks agreement on :                  \n\
+      * Application-version number;                                         \n\
+      * Client authentication;                                              \n\
+      * Server authentication (optionally).                                 \n\
+    sendauth() may ask the TGS for fresh application-credentials, and will  \n\
+    then add this new ticket and session-key to the credentials cache.      \n\
+                                                                            \n\
+:Return value:                                                              \n\
+    sendauth() returns only a new auth_context object, but this is a BUG:   \n\
+    The corresponding C call, krb5_sendauth(), also returns :               \n\
+      * the decrypted reply-message from the server (for interpretation),   \n\
+      * the application service-ticket (for reuse);                         \n\
+      * a KRB_ERROR structure (in case the client fails to authentocate).   \n\
+    Context.sendauth() should return a tuple.                               \n\
+                                                                            \n\
+:See also:                                                                  \n\
+KrbV.Context     method  : recvauth()                                       \n\
+KrbV.AuthContext methods : mk_priv(), rd_priv()                             \n\
+");
 
 static PyObject*
 Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
@@ -781,6 +1165,9 @@ Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
   {
     PyObject *subargs, *mykw = NULL, *otmp;
 
+    /* build & run a python call: AuthContext( context=self, ac=ac_out).             */
+    /* this makes a copy of sendauth's updated version of the client's auth_context. */
+    /* Context.sendauth() returns this updated auth_context.                         */
     subargs = Py_BuildValue("()");
     mykw = PyDict_New();
     PyDict_SetItemString(mykw, "context", self);
@@ -793,7 +1180,63 @@ Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
   }
 
   return retval;
-}
+} /* KrbV.Context.sendauth() */
+
+PyDoc_STRVAR(Context_recvauth__doc__,
+"Context_recvauth(fd, version, options, client, server, ccache, data) ->       \n\
+auth_context                                                                   \n\
+                                                                               \n\
+:Summary : Accept and complete an authenticated message-handshake.             \n\
+                                                                               \n\
+:Parameters :                                                                  \n\
+    fd : file descriptor                                                       \n\
+        a network socket (TCP only, not UDP)                                   \n\
+    version : str                                                              \n\
+        the client's version of the application protocol.                      \n\
+    server : KrbV.Principal (optional)                                         \n\
+        The application server's principal/instance name.                      \n\
+    keytab : KrbV.Keytab (optional)                                            \n\
+        The key table which contains the serer's secret key.                   \n\
+    options : int (optional)                                                   \n\
+        No server-side flags are defined yet for recvauth() in the krb5 C API. \n\
+    The first two arguments are positional, and the rest are all               \n\
+    keyword-parameters.                                                        \n\
+    BUG: recvauth() should have an auth_context parameter, which holds the     \n\
+    server's replay cache object.                                              \n\
+                                                                               \n\
+:Purpose :                                                                     \n\
+    recvauth() is a high-level routine that both receives a client's AP_REQ    \n\
+    service-request _and_ sends the server's corresponding AP_REP reply.       \n\
+    No application-specific data get exchanged, except for version numbers.    \n\
+    Note that only application-servers can call recvauth;  the                 \n\
+    corresponding client-side call is sendauth().                              \n\
+    The handshake's outcome is that the client & server both get complete      \n\
+    AuthContext objects, which they then can use to exchange encrypted         \n\
+    application-traffic via the AuthContext methods mk_priv() & rd_priv().     \n\
+                                                                               \n\
+    sendauth()/recvauth() is supposed to be easier to use than the similar-    \n\
+    but-lower-level KrbV.Context methods mk_req(),rd_req(),mk_rep(),rd_rep().  \n\
+                                                                               \n\
+:Action & side-effects :                                                       \n\
+    A sendauth()/recvauth() handshake seeks agreement on :                     \n\
+      * Application-version number;                                            \n\
+      * Client authentication;                                                 \n\
+      * Server authentication (optionally).                                    \n\
+    BUG: recvauth() needs an auth_context parameter, so that recvauth()        \n\
+    can add the AP_REQ's authenticator to the auth_context's replay cache.     \n\
+                                                                               \n\
+:Return value:                                                                 \n\
+    recvauth() returns only a new auth_context object, but this is a BUG:      \n\
+    The corresponding C call, krb5_recvauth(), also returns :                  \n\
+      * the application service-ticket (for reuse);                            \n\
+      * a KRB_ERROR structure (in case the version numbers don't match, or     \n\
+        the client fails to authenticate).                                     \n\
+    Context.sendauth() should return a tuple.                                  \n\
+                                                                               \n\
+:See also:                                                                     \n\
+KrbV.Context     method  : sendauth()                                          \n\
+KrbV.AuthContext methods : mk_priv(), rd_priv()                                \n\
+");
 
 static PyObject*
 Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
@@ -883,6 +1326,7 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
     }
   krb5_free_ticket(kctx, cticket);
 
+
   {
     PyObject *subargs, *mykw = NULL, *otmp, *auth_context;
 
@@ -899,8 +1343,41 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
   }
 
   return retval;
-}
+} /* KrbV.Context.recvauth() */
 
+PyDoc_STRVAR(Context_mk_rep__doc__,
+"mk_rep(auth_context) -> str                                                 \n\
+                                                                             \n\
+:Summary : Create Kerberos AP_REP Message (Authentication Handshake Reply)   \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    auth_context : KrbV.AuthContext                                          \n\
+        info about the kerberos-session, especially:                         \n\
+           * the client's & server's principal-names,                        \n\
+           * any session-key the server shares with the client,              \n\
+           * the session's replay-cache.                                     \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+An application server calls mk_rep() to prepare an AP_REP reply, after       \n\
+having authenticated a client's request for service (AP_REQ).                \n\
+                                                                             \n\
+:Action & side-effects:                                                      \n\
+mk_rep() prepares, but doesn't send, an AP_REP handshake-reply message.      \n\
+The most important part of this AP_REP message is the server's echo of       \n\
+the client's encrypted timestamp, re-encrypted for the client's eyes.        \n\
+The client will interpret the  server's echo of the timestamp as proof       \n\
+that it really is the correct app-server who is on the other end of the      \n\
+connection (since the server had to be able to decrypt the client's ticket,  \n\
+in order to encrypt the AP_REQ authenticator).                               \n\
+The server calls mk_rep() as the 3rd step in an authenticated handshake.     \n\
+                                                                             \n\
+:Return value:                                                               \n\
+    mk_rep() returns a Python string containing the AP_REP message.          \n\
+                                                                             \n\
+:See also:                                                                   \n\
+KrbV.Context     methods : mk_req(),  rd_req(), rd_rep();                    \n\
+KrbV.AuthContext methods : mk_priv(), rd_priv()                              \n\
+");
 static PyObject*
 Context_mk_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -934,8 +1411,43 @@ Context_mk_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   krb5_free_data_contents(kctx, &outbuf);
 
   return retval;
-}
+} /* KrbV.Context.mk_rep() */
 
+PyDoc_STRVAR(Context_rd_rep__doc__,
+"rd_rep(in_data, auth_context) -> 'None'                                    \n\
+                                                                            \n\
+:Parameters :                                                               \n\
+    in_data : buffer                                                        \n\
+         The buffer containing the AP_REP message.                          \n\
+    auth_context : KrbV.auth_context                                        \n\
+         info about the kerberos-session, especially:                       \n\
+            * the client's & server's principal-names,                      \n\
+            * any session-key the server shares with the client,            \n\
+            * the session's replay-cache.                                   \n\
+                                                                            \n\
+:Summary: Parse a Krb 'application reply' message.                          \n\
+                                                                            \n\
+:Purpose :                                                                  \n\
+An application-client calls rd_rep() in order to authenticate the           \n\
+app-server's AP_REP message.  The app-server's AP_REP message's main        \n\
+content is the server's echoed-&-reencrypted version of the client's        \n\
+encrypted timestamp (a.k.a. 'authenticator').                               \n\
+The client calls rd_rep() as the 4rd step in an authenticated handshake.    \n\
+This step completes the client's authentication with the app-server.        \n\
+                                                                            \n\
+:Action & side-effects :                                                    \n\
+rd_rep() doesn't actually read the AP_REP message from the network;         \n\
+rd_rep() only decrypts, decodes, and interprets the AP_REP message.         \n\
+rd_rep() checks whether the AP_REP message's encrypted timestamp matches    \n\
+exactly the encrypted timestamp that the client originally sent in the      \n\
+handshake's initial AP_REQ message.                                         \n\
+                                                                            \n\
+:Return value:                                                              \n\
+None.  BUG: rd_rep() should return at least a string containing the AP_REP  \n\
+message's contents, so that the client can confirm the server's echoed      \n\
+timestamp.  If these four routines {rd,mk}_re{p,q} are to support subkeys,  \n\
+then rd_rep() should also return the modified AuthContext parameter.        \n\
+");
 static PyObject*
 Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -972,19 +1484,19 @@ Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Context.rd_rep() */
 
 static PyMethodDef context_methods[] = {
-  {"__init__", Context_init, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"default_ccache", (PyCFunction)Context_cc_default, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"default_rcache", (PyCFunction)Context_rc_default, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"default_keytab", (PyCFunction)Context_kt_default, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"mk_req", (PyCFunction)Context_mk_req, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"rd_req", (PyCFunction)Context_rd_req, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"sendauth", (PyCFunction)Context_sendauth, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"recvauth", (PyCFunction)Context_recvauth, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"mk_rep", (PyCFunction)Context_mk_rep, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"rd_rep", (PyCFunction)Context_rd_rep, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"__init__", Context_init, METH_VARARGS|METH_KEYWORDS, Context_init__doc__},
+  {"default_ccache", (PyCFunction)Context_cc_default, METH_VARARGS|METH_KEYWORDS, Context_cc_default__doc__},
+  {"default_rcache", (PyCFunction)Context_rc_default, METH_VARARGS|METH_KEYWORDS, Context_rc_default__doc__},
+  {"default_keytab", (PyCFunction)Context_kt_default, METH_VARARGS|METH_KEYWORDS, Context_kt_default__doc__},
+  {"mk_req",         (PyCFunction)Context_mk_req,     METH_VARARGS|METH_KEYWORDS, Context_mk_req__doc__},
+  {"rd_req",         (PyCFunction)Context_rd_req,     METH_VARARGS|METH_KEYWORDS, Context_rd_req__doc__},
+  {"sendauth",       (PyCFunction)Context_sendauth,   METH_VARARGS|METH_KEYWORDS, Context_sendauth__doc__},
+  {"recvauth",       (PyCFunction)Context_recvauth,   METH_VARARGS|METH_KEYWORDS, Context_recvauth__doc__},
+  {"mk_rep",         (PyCFunction)Context_mk_rep,     METH_VARARGS|METH_KEYWORDS, Context_mk_rep__doc__},
+  {"rd_rep",         (PyCFunction)Context_rd_rep,     METH_VARARGS|METH_KEYWORDS, Context_rd_rep__doc__},
   {NULL, NULL, 0, NULL}
 };
 
@@ -992,8 +1504,9 @@ static PyObject *
 pk_context_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", Context_getattr, METH_VARARGS, NULL},
-    setattr = {"__setattr__", Context_setattr, METH_VARARGS, NULL};
+  static PyMethodDef
+    getattr = {"__getattr__", Context_getattr, METH_VARARGS, Context_getattr__doc__},
+    setattr = {"__setattr__", Context_setattr, METH_VARARGS, Context_setattr__doc__};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
   dict = PyDict_New();
@@ -1094,6 +1607,26 @@ port_to_addr(unsigned short port, krb5_address *krb5addr)
 }
 
 /*********************** AuthContext **********************/
+
+PyDoc_STRVAR(AuthContext_getattr__doc__,
+"__getattr__(string) -> value-object.                                           \n\
+                                                                                \n\
+:Summary : Set a member-field in the AuthContext object.                        \n\
+           Internal function, do not use.                                       \n\
+                                                                                \n\
+:Parameters :                                                                   \n\
+    __getattr__() can get only the following AuthContext-members:               \n\
+    * addrs  : tuple ( local_addr, local_port, remote_addr, remote_port)        \n\
+    * flags  : integer;  valid flag values are:                                 \n\
+	       KRB5_AUTH_CONTEXT_DO_TIME	Use timestamps                            \n\
+	       KRB5_AUTH_CONTEXT_RET_TIME	Save timestamps to output structure       \n\
+	       KRB5_AUTH_CONTEXT_DO_SEQUENCE	Use sequence numbers                      \n\
+	       KRB5_AUTH_CONTEXT_RET_SEQUENCE	Copy sequence numbers to output structure \n\
+                                                                                \n\
+:Return value :                                                                 \n\
+    NULL   means 'invalid attribute,'                                           \n\
+    non-zero integer is a kerberos error-code.                                  \n\
+");
 static PyObject*
 AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1189,6 +1722,32 @@ AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
   return retval;
 }
 
+PyDoc_STRVAR(AuthContext_setattr__doc__,
+"__setattr__(string, value-object) -> 'None' , NULL, or a kerberos error code.  \n\
+                                                                                \n\
+:Summary : Set a member-field in the AuthContext object.                        \n\
+           Internal function, do not use.                                       \n\
+                                                                                \n\
+:Parameters :                                                                   \n\
+    __setattr__() supports only the following AuthContext-members:              \n\
+    * addrs  : tuple ( local_addr, local_port, remote_addr, remote_port)        \n\
+    * flags  : integer;  valid flag values are:                                 \n\
+	       KRB5_AUTH_CONTEXT_DO_TIME	Use timestamps                            \n\
+	       KRB5_AUTH_CONTEXT_RET_TIME	Save timestamps to output structure       \n\
+	       KRB5_AUTH_CONTEXT_DO_SEQUENCE	Use sequence numbers                      \n\
+	       KRB5_AUTH_CONTEXT_RET_SEQUENCE	Copy sequence numbers to output structure \n\
+    * rcache      : rcache object               (Replay cache)                  \n\
+    * useruserkey : tuple ( enctype, string)    (encryption key)                \n\
+                                                                                \n\
+:Purpose :                                                                      \n\
+    __setattr__ changes the AuthContext contents, so as to control the behavior \n\
+    of the many krb-lib calls that use the AuthContext as a parameter.          \n\
+                                                                                \n\
+:Return value :                                                                 \n\
+    'None' means 'success,'                                                     \n\
+    NULL   means 'invalid value,'                                               \n\
+    non-zero integer is a kerberos error-code.                                  \n\
+");
 static PyObject*
 AuthContext_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1318,8 +1877,37 @@ AuthContext_setattr(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* LrbV.AuthContext.__setattr__() */
 
+PyDoc_STRVAR(AuthContext_rd_priv__doc__,
+"rd_priv() -> string, NULL or a kerberos error code                         \n\
+                                                                            \n\
+:Summary : rd_priv() decrypts and integrity-checks a buffer of ciphertext.  \n\
+                                                                            \n\
+:Parameters :                                                               \n\
+    in_data : string                                                        \n\
+        This buffer contains application-specific ciphertext, and is called \n\
+        a KRB_PRIV message.                                                 \n\
+                                                                            \n\
+:Purpose :                                                                  \n\
+    Applications call rd_priv() in order to receive an incoming application \n\
+    message that the sender protected from eavesdropping and from on-the-   \n\
+    fly alteration.  Either side of an application, client or server, can   \n\
+    use rd_priv() upon receiving protected, sensitive application traffic.  \n\
+    The incoming ciphertext is called a KRB_PRIV message, and was prepared  \n\
+    by the sender via a mk_priv() call.                                     \n\
+                                                                            \n\
+:Return Value :                                                             \n\
+    A string containing the decrypted plaintext, or an error code, if       \n\
+    rd_priv() detected tampering.                                           \n\
+                                                                            \n\
+:Action & side-effects :                                                    \n\
+    rd_priv() can be computationally expensive, if the application is       \n\
+    sending lots of encrypted traffic back-and-forth.  Developers should    \n\
+    use rd_priv() only when privacy is really necessary;  often, it's       \n\
+    enough to use rd_safe() instead, so as to protect the message only      \n\
+    from on-the-fly alteration, without the expense of encryption.          \n\
+");
 static PyObject *
 AuthContext_rd_priv(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1358,8 +1946,36 @@ AuthContext_rd_priv(PyObject *unself __UNUSED, PyObject *args)
   retval = PyString_FromStringAndSize(outbuf.data, outbuf.length);
   free(outbuf.data);
   return retval;
-}
+} /* KrbV.AuthContext.rd_priv() */
 
+PyDoc_STRVAR(AuthContext_mk_priv__doc__,
+"mk_priv() -> string, NULL or a kerberos error code                         \n\
+                                                                            \n\
+:Summary : mk_priv() encrypts and integrity-protects a buffer of plaintext. \n\
+                                                                            \n\
+:Parameters :                                                               \n\
+    in_data : string                                                        \n\
+        This buffer contains application-specific plaintext.                \n\
+                                                                            \n\
+:Purpose :                                                                  \n\
+    Applications call mk_priv() in order to protect an outgoing application \n\
+    message from eavesdropping and from on-the-fly alteration.  Either side \n\
+    of an application, client or server, can use mk_priv() before sending   \n\
+    sensitive application traffic.  The resulting ciphertext is called a    \n\
+    KRB_PRIV message.  After the other side receives this KRB_PRIV message, \n\
+    the recipient will use rd_priv() to decrypt and validate the message's  \n\
+    contents.                                                               \n\
+                                                                            \n\
+:Return Value :                                                             \n\
+    A KRB_PRIV message, which is a string containing the ciphertext.        \n\
+                                                                            \n\
+:Action & side-effects :                                                    \n\
+    mk_priv() can be computationally expensive, if the application is       \n\
+    sending lots of encrypted traffic back-and-forth.  Developers should    \n\
+    use mk_priv() only when privacy is really necessary;  often, it's       \n\
+    enough to use mk_safe() instead, so as to protect the message only      \n\
+    from on-the-fly alteration, without the expense of encryption.          \n\
+");
 static PyObject *
 AuthContext_mk_priv(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1398,13 +2014,37 @@ AuthContext_mk_priv(PyObject *unself __UNUSED, PyObject *args)
   retval = PyString_FromStringAndSize(outbuf.data, outbuf.length);
   free(outbuf.data);
   return retval;
-}
+} /* KrbV.AuthContext.mk_priv() */
 
 static void
 destroy_ac(void *cobj, void *desc)
 {
   krb5_auth_con_free(desc, cobj);
 }
+
+PyDoc_STRVAR(AuthContext_init__doc__,
+"__init__() -> KrbV.AuthContext                                              \n\
+                                                                             \n\
+:Summary : Create a KrbV AuthContext object.                                 \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+The KrbV.AuthContext class holds an authenticated connection's               \n\
+state, just as krb5.Context holds a thread or process's state.               \n\
+KrbV.AuthContext is used by the KrbV functions that directly                 \n\
+support authentication between an app-server & its client.                   \n\
+This class contains the addresses and port numbers for the                   \n\
+client and the server, keyblocks and sub-keys, sequence numbers,             \n\
+replay cache, and checksum-type, various flags, and more.                    \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+     __init__() returns an AuthContext object.                               \n\
+                                                                             \n\
+:Other Methods :                                                             \n\
+genaddrs()                                                                   \n\
+mk_priv()                                                                   .\n\
+rd_priv()                                                                    \n\
+");
 
 static PyObject*
 AuthContext_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
@@ -1447,8 +2087,37 @@ AuthContext_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.AuthContext.__init__() */
 
+PyDoc_STRVAR(AuthContext_genaddrs__doc__,
+"genaddrs(file_desc, flags) -> NULL, None, or a kerberos error code          \n\
+                                                                             \n\
+:Summary : Copy some or all of the socket's addresses and ports to the       \n\
+           AuthContext object.                                               \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    file_handle    : A socket's file-handle object;                          \n\
+    flags          : integer                                                 \n\
+        0x00000001 : generate the local  network address.                    \n\
+        0x00000002 : generate the remote network address.                    \n\
+        0x00000004 : generate the local  network address and the local port. \n\
+        0x00000008 : generate the remote network address and the local port. \n\
+        These flags can be OR'ed toegether, so as to extract some or all of  \n\
+        the socket's addresses and ports, selectively.                       \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    genaddrs() populates the AuthContext with optional addresses & ports.    \n\
+    Some applications need these addresses in order to authenticate          \n\
+    principals by IP-address, or for getting forwardable or proxiable        \n\
+    tickets.                                                                 \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    If the retval is:                                                        \n\
+    * None, then the genaddrs() call was successful.                         \n\
+    * NULL, then the socket's file-handle couldn't be converted to a         \n\
+      file-descriptor.                                                       \n\
+    * Non-zero, then the kerberos library call returned an error.            \n\
+");
 static PyObject*
 AuthContext_genaddrs(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -1479,13 +2148,13 @@ AuthContext_genaddrs(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.AuthContext.genaddrs() */
 
 static PyMethodDef auth_context_methods[] = {
-  {"__init__", (PyCFunction)AuthContext_init, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"genaddrs", (PyCFunction)AuthContext_genaddrs, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"mk_priv", (PyCFunction)AuthContext_mk_priv, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"rd_priv", (PyCFunction)AuthContext_rd_priv, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"__init__", (PyCFunction)AuthContext_init,     METH_VARARGS|METH_KEYWORDS, AuthContext_init__doc__},
+  {"genaddrs", (PyCFunction)AuthContext_genaddrs, METH_VARARGS|METH_KEYWORDS, AuthContext_genaddrs__doc__},
+  {"mk_priv",  (PyCFunction)AuthContext_mk_priv,  METH_VARARGS|METH_KEYWORDS, AuthContext_mk_priv__doc__},
+  {"rd_priv",  (PyCFunction)AuthContext_rd_priv,  METH_VARARGS|METH_KEYWORDS, AuthContext_rd_priv__doc__},
   {NULL, NULL, 0, NULL}
 };
 
@@ -1493,8 +2162,9 @@ static PyObject *
 pk_auth_context_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", AuthContext_getattr, METH_VARARGS, NULL},
-    setattr = {"__setattr__", AuthContext_setattr, METH_VARARGS, NULL};
+  static PyMethodDef
+    getattr = {"__getattr__", AuthContext_getattr, METH_VARARGS, AuthContext_getattr__doc__},
+    setattr = {"__setattr__", AuthContext_setattr, METH_VARARGS, AuthContext_setattr__doc__};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -1521,6 +2191,20 @@ pk_auth_context_make_class(PyObject *module)
 }
 
 /************************* Principal **********************************/
+PyDoc_STRVAR(Principal_getattr__doc__,
+"__getattr__(string) -> string                                                  \n\
+                                                                                \n\
+:Summary : Get the value of a member-field in the Principal object.             \n\
+           Internal function, do not use.                                       \n\
+                                                                                \n\
+:Parameters :                                                                   \n\
+    This method supports only the following members:                            \n\
+    * realm : string     eg, EXAMPLE.COM                                        \n\
+    * name  : string     eg, johndoe                                            \n\
+                                                                                \n\
+:Return Value :                                                                 \n\
+    __getattr__() always returns a string, unless the krb library call fails.   \n\
+");
 static PyObject*
 Principal_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1577,8 +2261,23 @@ Principal_getattr(PyObject *unself __UNUSED, PyObject *args)
     }
 
   return retval;
-}
+} /* KrbV.Principal.__getattr__() */
 
+PyDoc_STRVAR(Principal_setattr__doc__,
+"__setattr__(string, object) -> NULL, or None.                                  \n\
+                                                                                \n\
+:Summary : Set the value of a member-field in the Principal object.             \n\
+           Internal function, do not use.                                       \n\
+                                                                                \n\
+:Parameters :                                                                   \n\
+    This method _doesn't_ support setting the following members:                \n\
+    * realm : string     eg, EXAMPLE.COM                                        \n\
+    * name  : string     eg, johndoe                                            \n\
+                                                                                \n\
+:Return Value :                                                                 \n\
+    NULL means you tried to set a disallowed member's value.                    \n\
+    None means you successfully set some other member's value.                  \n\
+");
 static PyObject*
 Principal_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1624,7 +2323,7 @@ Principal_setattr(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Principal.__setattr__() */
 
 static void
 destroy_principal(void *cobj, void *desc)
@@ -1632,6 +2331,39 @@ destroy_principal(void *cobj, void *desc)
   krb5_free_principal(desc, cobj);
 }
 
+PyDoc_STRVAR(Principal_init__doc__,
+"__init__(string, KrbV.Context) -> KrbV.Principal                            \n\
+                                                                             \n\
+:Summary : Create a Principal object.                                        \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    name : string     eg, johhndoe@EXAMPLE.COM                               \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    A kerberos principal is the basic account-indentifier for all users and  \n\
+    application-services that Kerberos authenticates.  The Principal object  \n\
+    contains mostly names:                                                   \n\
+      * The 'principal name': the user's name or the service's name,         \n\
+      * The Kerberos 'realm name', which identifies which kerberos           \n\
+        key-database knows about this user or service.                       \n\
+      * A service-principal also contains an FQDN for a server               \n\
+        that offers the service.                                             \n\
+    For example:                                                             \n\
+      * 'johndoe/EXAMPLE.COM' is a user's principal, containing both         \n\
+        his Principal name johndoe and his realm name EXAMPLE.COM            \n\
+      * 'NFS/filer-1.EXAMPLE.COM' is a server's principal, containing        \n\
+        the principal name NFS, the server's FQDN, including the realm name. \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    A Principal object, containing the name components.                      \n\
+                                                                             \n\
+:Other methods :                                                             \n\
+    __getitem__()                                                            \n\
+    __len__()                                                                \n\
+    __eq__()                                                                 \n\
+    __repr__()                                                               \n\
+");
 static PyObject*
 Principal_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -1685,8 +2417,27 @@ Principal_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Principal.__init(__) */
 
+PyDoc_STRVAR(Principal_getitem__doc__,
+"__getitem__(integer) -> string                                              \n\
+                                                                             \n\
+:Summary : Get the i^th name component from a principal.                     \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    index : integer                                                          \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    A string containing the indexed name-component in the principal.         \n\
+    __getitem__() returns NULL if anything goes wrong.                       \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    A Principal holds names in a parsed array of name-components, where      \n\
+    a 'component' is a string that appears between dots or slashes.          \n\
+    __getitem__() is a krb-internal routine, mostly used for comparing       \n\
+    principals, and for reassembling the name-components.                    \n\
+");
 static PyObject*
 Principal_getitem(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1726,8 +2477,24 @@ Principal_getitem(PyObject *unself __UNUSED, PyObject *args)
   retval = PyString_FromStringAndSize(d->data, d->length);
 
   return retval;
-}
+} /* KrbV.Principal.__getitem__() */
 
+PyDoc_STRVAR(Principal_itemlen__doc__,
+"__len__() -> integer                                                        \n\
+                                                                             \n\
+:Summary : Get the number of name-components that a principal has.           \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    A string containing how many name-component are in the principal.        \n\
+    __getitem__() returns NULL if anything goes wrong.                       \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    A Principal holds names in a parsed array of name-components, where      \n\
+    a 'component' is a string that appears between dots or slashes.          \n\
+    __len__() is a krb-internal routine, mostly used for comparing           \n\
+    principals, and when reassembling the name-components.                   \n\
+");
 static PyObject*
 Principal_itemlen(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1750,9 +2517,21 @@ Principal_itemlen(PyObject *unself __UNUSED, PyObject *args)
     princ = PyCObject_AsVoidPtr(tmp);
 
   return PyInt_FromLong(krb5_princ_size(ctx, princ));
-}
+} /* KrbV.Principal.__len__() */
 
-
+PyDoc_STRVAR(Principal_eq__doc__,
+"__eq__( Principal, Principal) -> integer or None                            \n\
+                                                                             \n\
+:Summary : Compare two principals' names.                                    \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    Two Principals.                                                          \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    1, if the principals are equal;                                          \n\
+    None, if the principals are different.                                   \n\
+");
 static PyObject*
 Principal_eq(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1784,8 +2563,18 @@ Principal_eq(PyObject *unself __UNUSED, PyObject *args)
     return PyInt_FromLong(1);
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Principal.__eq__() */
 
+PyDoc_STRVAR(Principal_repr__doc__,
+"__repr__() -> string                                                         \n\
+                                                                              \n\
+:Summary : Make a printable string from the Principal.                        \n\
+           Internal function, do not use.                                     \n\
+                                                                              \n\
+:Purpose :                                                                    \n\
+     Reassemble a principal's name-components, to make a printable            \n\
+     representation of the principal.                                         \n\
+");
 static PyObject*
 Principal_repr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1795,7 +2584,7 @@ Principal_repr(PyObject *unself __UNUSED, PyObject *args)
   char *outname, *outbuf;
   krb5_error_code rc;
 
-  if(!PyArg_ParseTuple(args, "O:__len__", &self))
+  if(!PyArg_ParseTuple(args, "O:__repr__", &self))
     return NULL;
 
   tmp = PyObject_GetAttrString(self, "context");
@@ -1818,14 +2607,14 @@ Principal_repr(PyObject *unself __UNUSED, PyObject *args)
   retval = PyString_FromString(outbuf);
   free(outname);
   return retval;
-}
+} /* KrbV.Principal.__repr__() */
 
 static PyMethodDef principal_methods[] = {
-  {"__init__", (PyCFunction)Principal_init, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"__getitem__", (PyCFunction)Principal_getitem, METH_VARARGS, NULL},
-  {"__len__", (PyCFunction)Principal_itemlen, METH_VARARGS, NULL},
-  {"__eq__", (PyCFunction)Principal_eq, METH_VARARGS, NULL},
-  {"__repr__", (PyCFunction)Principal_repr, METH_VARARGS, NULL},
+  {"__init__",    (PyCFunction)Principal_init,    METH_VARARGS|METH_KEYWORDS, Principal_init__doc__},
+  {"__getitem__", (PyCFunction)Principal_getitem, METH_VARARGS, Principal_getitem__doc__},
+  {"__len__",     (PyCFunction)Principal_itemlen, METH_VARARGS, Principal_itemlen__doc__},
+  {"__eq__",      (PyCFunction)Principal_eq,      METH_VARARGS, Principal_eq__doc__},
+  {"__repr__",    (PyCFunction)Principal_repr,    METH_VARARGS, Principal_repr__doc__},
   {NULL, NULL, 0, NULL}
 };
 
@@ -1833,8 +2622,9 @@ static PyObject *
 pk_principal_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", Principal_getattr, METH_VARARGS, NULL},
-    setattr = {"__setattr__", Principal_setattr, METH_VARARGS, NULL};
+  static PyMethodDef
+    getattr = {"__getattr__", Principal_getattr, METH_VARARGS, Principal_getattr__doc__},
+    setattr = {"__setattr__", Principal_setattr, METH_VARARGS, Principal_setattr__doc__};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -1860,6 +2650,21 @@ pk_principal_make_class(PyObject *module)
 }
 
 /************************* Creds cache **********************************/
+PyDoc_STRVAR(CCache_getattr__doc__,
+"__getattr__(string) -> string                                               \n\
+                                                                             \n\
+:Summary : Get the value of a member-field in the CCache object.             \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    __getattr__() method can access only the following members:              \n\
+    * name : string  name for the ticket cache, with no type prefix.         \n\
+    * type : string  CCache type-prefix.                                     \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    NULL means you tried to access a member that has no value.               \n\
+    None means a krb llibrary call threw an error.                           \n\
+");
 static PyObject*
 CCache_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1913,8 +2718,23 @@ CCache_getattr(PyObject *unself __UNUSED, PyObject *args)
     }
 
   return retval;
-}
+} /* KrbV.CCache.__getattr__() */
 
+PyDoc_STRVAR(CCache_setattr__doc__,
+"__setattr__() -> NULL or None                                               \n\
+                                                                             \n\
+:Summary : Set the value of a member-field in the CCache object.             \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    __setattr__() method _doesn't_ support setting the following members:    \n\
+    * name                                                                   \n\
+    * type                                                                   \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    NULL means you tried to set a disallowed member's value.                 \n\
+    None means you successfully set some other member's value.               \n\
+");
 static PyObject*
 CCache_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -1958,7 +2778,7 @@ CCache_setattr(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.CCache.__setattr__() */
 
 static void
 destroy_ccache(void *cobj, void *desc)
@@ -1966,6 +2786,27 @@ destroy_ccache(void *cobj, void *desc)
   krb5_cc_close((krb5_context)desc, (krb5_ccache)cobj);
 }
 
+PyDoc_STRVAR(CCache__init__doc__,
+" __init__() -> CCache                                                       \n\
+                                                                             \n\
+:Summary : Create a new Credentials Cache.                                   \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    name               : string        (optional) pathname for ticket file   \n\
+    ccache             : CCache        (optional) empty CCache object        \n\
+    primary_principal  : Principal     (optional)                            \n\
+    context            : Context       (optional)                            \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    CCache object                                                            \n\
+                                                                             \n\
+:Other Methods :                                                             \n\
+  initialize()                                                               \n\
+  __eq__()                                                                   \n\
+  get_credentials()                                                          \n\
+  init_creds_keytab()                                                        \n\
+  principal()                                                                \n\
+");
 static PyObject*
 CCache__init__(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -2041,8 +2882,21 @@ CCache__init__(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.CCache.__init__() */
 
+PyDoc_STRVAR(CCache_eq__doc__,
+"__eq__(CCache, CCache) -> 1 or None                                         \n\
+                                                                             \n\
+:Summary : Compare two credentials-cache objects, by Principal-name          \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    Two Credentials Cache (CCache) objects.                                  \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    1 if the two CCache objects have the same principal name,                \n\
+    None if the two CCache objects' principal names are different.           \n\
+");
 static PyObject*
 CCache_eq(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -2075,8 +2929,18 @@ CCache_eq(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
-
+} /* KrbV.CCache.__eq__() */
+PyDoc_STRVAR(CCache_principal__doc__,
+"principal() -> Principal                                                    \n\
+                                                                             \n\
+:Summary : Get the value of the CCache's principal member.                   \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    KrbV.Principal                                                           \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    Get the Principal object for the user or service that owns the CCache.   \n\
+");
 static PyObject*
 CCache_principal(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -2131,8 +2995,26 @@ CCache_principal(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   }
 
   return retval;
-}
+} /* KrbV.CCache.principal() */
 
+PyDoc_STRVAR(CCache_init_creds_keytab__doc__,
+"init_creds_keytab(keytab, principal) -> NULL, None, or krb error code       \n\
+                                                                             \n\
+:Summary : Get a server's initial credentials, using a keytab.               \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    keytab                                                                   \n\
+    principal                                                                \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    None means everything worked.                                            \n\
+    NULL means the principal name was invalid.                               \n\
+    nonzero integer means the TGT-request failed somehow.                    \n\
+                                                                             \n\
+:See also :                                                                  \n\
+    get_credentials() - for application-clients that need to request & use  \n\
+    tickets.                                                                 \n\
+");
 static PyObject*
 CCache_init_creds_keytab(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -2191,8 +3073,25 @@ CCache_init_creds_keytab(PyObject *unself __UNUSED, PyObject *args, PyObject *kw
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.CCache.init_creds_keytab() */
 
+PyDoc_STRVAR(CCache_initialize__doc__,
+"initialize(Principal) ->  None, NULL, or krb error code.                    \n\
+                                                                             \n\
+:Summary : Initialize a CCache for a principal                               \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    Principal : the user or service that owns this ccache.                   \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    None means everything worked.                                            \n\
+    NULL means the principal name was invalid.                               \n\
+    nonzero integer means the krb library threw an error.                    \n\
+                                                                             \n\
+:See also :                                                                  \n\
+    init_creds_keytab() - for services that need to request & use client-    \n\
+    side.                                                                    \n\
+");
 static PyObject*
 CCache_initialize(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -2237,7 +3136,38 @@ CCache_initialize(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   Py_INCREF(Py_None);
   return Py_None;
 }
-
+PyDoc_STRVAR(CCache_get_credentials__doc__,
+"get_credentials(Creds_tuple, integer, integer) -> Creds_tuple               \n\
+                                                                             \n\
+:Summary : Get an application-service ticket.                                \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    in_creds : Creds_tuple                                                   \n\
+    options  : integer                                                       \n\
+       0x00000001 KRB5_GC_USER_USER    Get a peer-to-peer ticket             \n\
+       0x00000002 KRB5_GC_CACHED       Don't request a new ticket            \n\
+    basepid  : integer       (unused?)                                       \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    Creds_tuple                                                              \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    get_credentials() is the normal way for an application client to         \n\
+    get tickets on the user's behalf.                                        \n\
+                                                                             \n\
+:Action & side-effects :                                                     \n\
+  * If the CCache contains up-to-date tickets for this service,              \n\
+    get_credentials() retrieves those tickets from in_creds or the CCache.   \n\
+  * If the CCache doesn't have up-to-date tickets, get_credentials()         \n\
+    uses the user's TGT, in the in_creds parameter, to request tickets.      \n\
+  * Either way, get credentials() returns an up-to-date application-ticket.  \n\
+  * get_credentials() also may use the CCache self-object to find the TGT    \n\
+    and to store the new tickets.                                            \n\
+                                                                             \n\
+:See also :                                                                  \n\
+    init_creds_keytab() - for application-servers that need to request & use \n\
+    client-side tickets.                                                     \n\
+");
 static PyObject*
 CCache_get_credentials(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -2261,7 +3191,7 @@ CCache_get_credentials(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if(!PyArg_ParseTuple(subtmp, "OO(iz#)(iiii)OOOz#z#O",
 		       &client, &server,
 		       &in_creds.keyblock.enctype, &in_creds.keyblock.contents, &in_creds.keyblock.length,
-		       &in_creds.times.authtime, &in_creds.times.starttime, &in_creds.times.endtime,
+		       &in_creds.times.authtime,   &in_creds.times.starttime,   &in_creds.times.endtime,
 		       &in_creds.times.renew_till, &tmp, &tmp, &tmp,
 		       &in_creds.ticket.data,
 		       &in_creds.ticket.length,
@@ -2385,15 +3315,15 @@ CCache_get_credentials(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   krb5_free_creds(ctx, out_creds);
 
   return retval;
-}
+} /* KrbV.CCache.get_credentials() */
 
 static PyMethodDef ccache_methods[] = {
-  {"__init__", (PyCFunction)CCache__init__, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"__eq__", (PyCFunction)CCache_eq, METH_VARARGS, NULL},
-  {"principal", (PyCFunction)CCache_principal, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"get_credentials", (PyCFunction)CCache_get_credentials, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"init_creds_keytab", (PyCFunction)CCache_init_creds_keytab, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"init", (PyCFunction)CCache_initialize, METH_VARARGS|METH_KEYWORDS, NULL},
+  {"__init__",         (PyCFunction)CCache__init__,          METH_VARARGS|METH_KEYWORDS, CCache__init__doc__},
+  {"__eq__",           (PyCFunction)CCache_eq,               METH_VARARGS,               CCache_eq__doc__},
+  {"principal",        (PyCFunction)CCache_principal,        METH_VARARGS|METH_KEYWORDS, CCache_principal__doc__},
+  {"get_credentials",  (PyCFunction)CCache_get_credentials,  METH_VARARGS|METH_KEYWORDS, CCache_get_credentials__doc__},
+  {"init_creds_keytab",(PyCFunction)CCache_init_creds_keytab,METH_VARARGS|METH_KEYWORDS, CCache_init_creds_keytab__doc__},
+  {"init",             (PyCFunction)CCache_initialize,       METH_VARARGS|METH_KEYWORDS, CCache_initialize__doc__},
   {NULL, NULL, 0, NULL}
 };
 
@@ -2401,8 +3331,9 @@ static PyObject *
 pk_ccache_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", CCache_getattr, METH_VARARGS, NULL},
-    setattr = {"__setattr__", CCache_setattr, METH_VARARGS, NULL};
+  static PyMethodDef
+    getattr = {"__getattr__", CCache_getattr, METH_VARARGS, CCache_getattr__doc__},
+    setattr = {"__setattr__", CCache_setattr, METH_VARARGS, CCache_setattr__doc__};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -2428,6 +3359,13 @@ pk_ccache_make_class(PyObject *module)
 }
 
 /************************* replay cache **********************************/
+PyDoc_STRVAR(RCache_getattr__doc__,
+"__getattr__() -> NULL                                                       \n\
+:Summary : Vestigial internal function, do not use.                          \n\
+:Purpose:                                                                    \n\
+     In recent versions of Kerberos, the rcache has become a totally opaque  \n\
+     object, and there are no public methods to get information about it.    \n\
+");
 static PyObject*
 RCache_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -2445,6 +3383,13 @@ RCache_getattr(PyObject *unself __UNUSED, PyObject *args)
   return NULL;
 }
 
+PyDoc_STRVAR(RCache_setattr__doc__,
+"__setattr__() -> NULL                                                       \n\
+:Summary : Vestigial internal function, do not use.                          \n\
+:Purpose:                                                                    \n\
+     In recent versions of Kerberos, the rcache has become a totally opaque  \n\
+     object, and there are no public methods to set RCache attributes.       \n\
+");
 static PyObject*
 RCache_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -2486,7 +3431,27 @@ RCache_setattr(PyObject *unself __UNUSED, PyObject *args)
   Py_INCREF(Py_None);
   return Py_None;
 }
-
+PyDoc_STRVAR(RCache_init__doc__,
+"__init__(context, string) -> NULL or None                                   \n\
+                                                                             \n\
+:Summary : Initialize a new RCache object (replay cache).                    \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    context : KrbV.Context      (optional) kerberos context object           \n\
+    name    : string            (optional) a unique name for the cache       \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    None means success                                                       \n\
+    NULL means the krb library couldn't find a replay-cache.                 \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    A replay-cache is a server-side object, which the server's krb-lib uses  \n\
+    to detect and reject replays of recently-offered client credentials.     \n\
+                                                                             \n\
+:Other Methods :                                                             \n\
+    __eq__() - Compare two replay caches by principal name.                  \n\
+");
 static PyObject*
 RCache_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
@@ -2539,8 +3504,21 @@ RCache_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.RCache.__init__() */
 
+PyDoc_STRVAR(RCache_eq__doc__,
+"__eq__() -> 1 or None                                                       \n\
+                                                                             \n\
+:Summary : Compare two replay caches, by Principal-name.                     \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    Two RCache objects.                                                      \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    1 means the two RCache objects have the  same principal name.            \n\
+    None means the  RCache objects have different principal names.           \n\
+");
 static PyObject*
 RCache_eq(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -2573,11 +3551,11 @@ RCache_eq(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.RCache.__eq__() */
 
 static PyMethodDef rcache_methods[] = {
-  {"__init__", (PyCFunction)RCache_init, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"__eq__", (PyCFunction)RCache_eq, METH_VARARGS, NULL},
+  {"__init__", (PyCFunction)RCache_init, METH_VARARGS|METH_KEYWORDS, RCache_init__doc__},
+  {"__eq__",   (PyCFunction)RCache_eq,   METH_VARARGS,               RCache_eq__doc__},
   {NULL, NULL, 0, NULL}
 };
 
@@ -2585,8 +3563,9 @@ static PyObject *
 pk_rcache_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", RCache_getattr, METH_VARARGS, NULL},
-    setattr = {"__setattr__", RCache_setattr, METH_VARARGS, NULL};
+  static PyMethodDef
+    getattr = {"__getattr__", RCache_getattr, METH_VARARGS, RCache_getattr__doc__},
+    setattr = {"__setattr__", RCache_setattr, METH_VARARGS, RCache_setattr__doc__};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -2612,6 +3591,21 @@ pk_rcache_make_class(PyObject *module)
 }
 
 /************************* keytab **********************************/
+
+PyDoc_STRVAR(Keytab_getattr__doc__,
+"__getattr__(string) -> string                                               \n\
+                                                                             \n\
+:Summary : Get the value of a member-field in the Keytab object.             \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    __getattr__() method can access only the following members:              \n\
+    * name : string  name for the keytab file, in 'type:name' format.        \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    NULL means you tried to access a member that has no value.               \n\
+    None means a krb llibrary call threw an error.                           \n\
+");
 static PyObject*
 Keytab_getattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -2655,8 +3649,22 @@ Keytab_getattr(PyObject *unself __UNUSED, PyObject *args)
     }
 
   return retval;
-}
+} /* KrbV.Keytab.__getattr__() */
 
+PyDoc_STRVAR(Keytab_setattr__doc__,
+"__setattr__() -> NULL or None                                               \n\
+                                                                             \n\
+:Summary : Set the value of a member-field in the Keytab object.             \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    __setattr__() method _doesn't_ support setting the following members:    \n\
+    * name                                                                   \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    NULL means you tried to set a disallowed member's value.                 \n\
+    None means you successfully set some other member's value.               \n\
+");
 static PyObject*
 Keytab_setattr(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -2699,7 +3707,7 @@ Keytab_setattr(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Keytab.__setattr__() */
 
 static void
 destroy_keytab(void *cobj, void *desc)
@@ -2707,19 +3715,49 @@ destroy_keytab(void *cobj, void *desc)
   krb5_kt_close((krb5_context)desc, (krb5_keytab)cobj);
 }
 
+PyDoc_STRVAR(Keytab_init__doc__,
+"__init__(context, string) -> NULL or None                                   \n\
+                                                                             \n\
+:Summary : Initialize a new Keytab object.                                   \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    context : Context object (optional) kerberos context object              \n\
+    name    : string         (optional)                                      \n\
+                             The key table name in the format 'type:name'.   \n\
+                             The type must be a registered keytab type.      \n\
+                             The name must be unique for this type.          \n\
+    keytab  : Keytab object  (optional)                                      \n\
+                                                                             \n\
+:Return Value :                                                              \n\
+    None means success                                                       \n\
+    NULL means the krb library couldn't find a keytab.                       \n\
+                                                                             \n\
+:Purpose :                                                                   \n\
+    A Keytab is a server-side object, which the server's krb-lib uses        \n\
+    to access an application-server's secret key.                            \n\
+                                                                             \n\
+:Action & side-effects:                                                      \n\
+  * If __init__() gets called without a Keytab name parameter, then the      \n\
+    server's default keytab gets opened.                                     \n\
+  * The new Keytab's context attribute is filled with the context parameter. \n\
+                                                                             \n\
+:Other Methods :                                                             \n\
+    __eq__() - Compare two keytab objects by principal name.                 \n\
+");
 static PyObject*
 Keytab_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   PyObject *self;
-  PyObject *cobj, *conobj = NULL, *new_rc = NULL;
-  char *ccname = NULL;
+  PyObject *cobj, *conobj = NULL, *new_kt = NULL;
+  char *ktname = NULL;
   krb5_context ctx;
   krb5_keytab keytab;
   krb5_error_code rc;
   int is_dfl = 0;
   static const char *kwlist[] = {"self", "name", "keytab", "context", NULL};
 
-  if(!PyArg_ParseTupleAndKeywords(args, kw, "O|zOO:__init__", (char **)kwlist, &self, &ccname, &new_rc, &conobj))
+  if(!PyArg_ParseTupleAndKeywords(args, kw, "O|zOO:__init__", (char **)kwlist, &self, &ktname, &new_kt, &conobj))
     return NULL;
 
   if(!conobj)
@@ -2729,14 +3767,14 @@ Keytab_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   assert(cobj);
   ctx = PyCObject_AsVoidPtr(cobj);
 
-  if(new_rc)
+  if(new_kt)
     {
       rc = 0;
-      keytab = PyCObject_AsVoidPtr(new_rc);
+      keytab = PyCObject_AsVoidPtr(new_kt);
     }
-  else if(ccname)
+  else if(ktname)
     {
-      rc = krb5_kt_resolve(ctx, ccname, &keytab);
+      rc = krb5_kt_resolve(ctx, ktname, &keytab);
     }
   else
     {
@@ -2758,8 +3796,21 @@ Keytab_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Keytab.__init__() */
 
+PyDoc_STRVAR(Keytab_eq__doc__,
+"__eq__() -> 1 or None                                                       \n\
+                                                                             \n\
+:Summary : Compare two Keytab objects, by Principal-name.                    \n\
+           Internal function, do not use.                                    \n\
+                                                                             \n\
+:Parameters :                                                                \n\
+    Two Keytab objects.                                                      \n\
+                                                                             \n\
+:Return value :                                                              \n\
+    1 means the two Keytab objects have the  same principal name.            \n\
+    None means the  Keytab objects have different principal names.           \n\
+");
 static PyObject*
 Keytab_eq(PyObject *unself __UNUSED, PyObject *args)
 {
@@ -2792,11 +3843,11 @@ Keytab_eq(PyObject *unself __UNUSED, PyObject *args)
 
   Py_INCREF(Py_None);
   return Py_None;
-}
+} /* KrbV.Keytab.__eq__() */
 
 static PyMethodDef keytab_methods[] = {
-  {"__init__", (PyCFunction)Keytab_init, METH_VARARGS|METH_KEYWORDS, NULL},
-  {"__eq__", (PyCFunction)Keytab_eq, METH_VARARGS, NULL},
+  {"__init__", (PyCFunction)Keytab_init, METH_VARARGS|METH_KEYWORDS, Keytab_init__doc__},
+  {"__eq__",   (PyCFunction)Keytab_eq,   METH_VARARGS,               Keytab_eq__doc__},
   {NULL, NULL, 0, NULL}
 };
 
@@ -2804,8 +3855,9 @@ static PyObject *
 pk_keytab_make_class(PyObject *module)
 {
   PyMethodDef *def;
-  static PyMethodDef getattr = {"__getattr__", Keytab_getattr, METH_VARARGS, NULL},
-    setattr = {"__setattr__", Keytab_setattr, METH_VARARGS, NULL};
+  static PyMethodDef
+    getattr = {"__getattr__", Keytab_getattr, METH_VARARGS, Keytab_getattr__doc__},
+    setattr = {"__setattr__", Keytab_setattr, METH_VARARGS, Keytab_setattr__doc__};
   PyObject *dict, *name, *retval;
   PyClassObject *klass;
 
@@ -2828,7 +3880,7 @@ pk_keytab_make_class(PyObject *module)
   klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
 
   return retval;
-}
+} /* pk_keytab_make_class() */
 
 /****** main module ********/
 static PyObject *

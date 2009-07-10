@@ -32,6 +32,12 @@ DIE=0
 	DIE=1
 }
 
+# Check for libtool
+(libtool --version) < /dev/null > /dev/null 2>&1 ||{
+	echo
+	echo "You must have libtool installed"
+	DIE=1
+}
 
 if test "$DIE" -eq 1; then
 	exit 1
@@ -57,8 +63,8 @@ autoconf
 
 cd $ORIGDIR
 
-echo "Running $srcdir/configure --enable-maintainer-mode" "$@"
-$srcdir/configure --enable-maintainer-mode "$@" || DIE=1
+echo "Running $srcdir/configure" "$@"
+$srcdir/configure "$@" || DIE=1
 
 if test "$DIE" -eq 1; then
 	exit 1
