@@ -1,23 +1,19 @@
-%{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(plat_specific=True)")} 
+%{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(1))")}
 
 Name: python-krbV
-Version: 1.0.13
-Release: 4%{?dist}
+Version: 1.0.14
+Release: 1%{?dist}
 Summary: Python extension module for Kerberos 5
 
 Group: Development/Languages
-License: LGPL
+License: LGPLv2+
 
 URL: http://people.redhat.com/mikeb/python-krbV
 Source: http://people.redhat.com/mikeb/python-krbV/python-krbV-%{version}.tar.gz
 
-Buildroot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-
 BuildRequires: python-devel
 BuildRequires: krb5-devel >= 1.2.2
 BuildRequires: /bin/awk
-
-Requires: python-abi = %(%{__python} -c "import sys ; print sys.version[:3]")
 
 %description
 python-krbV allows python programs to use Kerberos 5 authentication/security.
@@ -34,7 +30,7 @@ export CFLAGS="%{optflags} -Wextra"
 %install
 %{__rm} -rf %{buildroot}
 %makeinstall
-%{__rm} -f %{buildroot}/%{python_sitelib}/*.la
+%{__rm} -f %{buildroot}/%{python_sitearch}/*.la
 
 %clean
 %{__rm} -rf %{buildroot}
@@ -42,9 +38,12 @@ export CFLAGS="%{optflags} -Wextra"
 %files
 %defattr(-,root,root,-)
 %doc README COPYING krbV-code-snippets.py
-%{python_sitelib}/krbVmodule.so
+%{python_sitearch}/krbVmodule.so
 
 %changelog
+* Mon Jan 18 2010 Mike Bonnet <mikeb@redhat.com> - 1.0.14-1
+- new release with better docstrings
+
 * Wed Sep 13 2006 Mike Bonnet <mikeb@redhat.com> - 1.0.13-4
 - support building against krb5-1.5, where the headers have been moved to /usr/include/krb5
 
