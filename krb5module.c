@@ -384,7 +384,7 @@ Context_kt_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   return retval;
 } /* KrbV.Context.default_keytab() */
 
-PyDoc_STRVAR(Creds_tuple__doc__,
+PyDoc_STRVAR(__UNUSED Creds_tuple__doc__,
 "Creds_tuple object                                                          \n\
                                                                              \n\
 :Purpose :  A Creds_tuple holds a single entry from a CCache.                \n\
@@ -1611,7 +1611,7 @@ port_to_addr(unsigned short port, krb5_address *krb5addr)
 PyDoc_STRVAR(AuthContext_getattr__doc__,
 "__getattr__(string) -> value-object.                                           \n\
                                                                                 \n\
-:Summary : Set a member-field in the AuthContext object.                        \n\
+:Summary : Get a member-field in the AuthContext object.                        \n\
            Internal function, do not use.                                       \n\
                                                                                 \n\
 :Parameters :                                                                   \n\
