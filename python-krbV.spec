@@ -1,4 +1,4 @@
-%{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(1))")}
+%{!?python_sitearch: %global python_sitearch %([ -x %{__python} ] && %{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)" || :)}
 
 Name: python-krbV
 Version: 1.0.90
@@ -14,6 +14,8 @@ Source: http://people.redhat.com/mikeb/python-krbV/python-krbV-%{version}.tar.gz
 BuildRequires: python-devel
 BuildRequires: krb5-devel >= 1.2.2
 BuildRequires: /bin/awk
+
+BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 %description
 python-krbV allows python programs to use Kerberos 5 authentication/security.
