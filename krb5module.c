@@ -1642,6 +1642,20 @@ AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
 
     if (key)
       krb5_free_keyblock(ctx, key);
+  } else if (!strcmp(name, "localseqnumber")) {
+    krb5_int32 seqnum;
+    rc = krb5_auth_con_getlocalseqnumber(ctx, ac, &seqnum);
+    if (rc)
+      return pk_error(rc);
+
+    retval = PyInt_FromLong(seqnum);
+  } else if (!strcmp(name, "remoteseqnumber")) {
+    krb5_int32 seqnum;
+    rc = krb5_auth_con_getremoteseqnumber(ctx, ac, &seqnum);
+    if (rc)
+      return pk_error(rc);
+
+    retval = PyInt_FromLong(seqnum);
   } else {
     PyErr_Format(PyExc_AttributeError, "%.50s instance has no attribute '%.400s'",
 		 PyString_AS_STRING(((PyInstanceObject *)self)->in_class->cl_name), name);
