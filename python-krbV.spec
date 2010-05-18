@@ -1,7 +1,7 @@
 %{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(1))")}
 
 Name: python-krbV
-Version: 1.0.14
+Version: 1.0.90
 Release: 1%{?dist}
 Summary: Python extension module for Kerberos 5
 
@@ -41,6 +41,11 @@ export CFLAGS="%{optflags} -Wextra"
 %{python_sitearch}/krbVmodule.so
 
 %changelog
+* Tue May 18 2010 Mike Bonnet <mikeb@redhat.com> - 1.0.90-1
+- return the contents of the AP_REP message from rd_rep()
+- improved memory handling
+- removed use of KRB_PRIVATE
+
 * Mon Jan 18 2010 Mike Bonnet <mikeb@redhat.com> - 1.0.14-1
 - new release with better docstrings
 
