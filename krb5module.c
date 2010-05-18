@@ -3883,7 +3883,7 @@ initkrbV(void)
 
   PyDict_SetItemString(dict, "__doc__",
 		       PyString_FromString(
-					   "This module implements python bindings to the Kerberos5 API."
+					   "This module implements python bindings to the Kerberos 5 API."
 					   ));
 
   revdict = PyDict_New();
