@@ -1623,8 +1623,7 @@ AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
       return pk_error(rc);
     retval = PyInt_FromLong(flags);
   } else if (!strcmp(name, "addrs")) {
-    krb5_address **addrs = malloc(sizeof(krb5_address *) * 3);
-    memset(addrs, 0, sizeof(krb5_address *) * 3);
+    krb5_address **addrs = calloc(3, sizeof(krb5_address *));
     rc = krb5_auth_con_getaddrs(ctx, ac, &addrs[0], &addrs[1]);
     if (rc)
       return pk_error(rc);
