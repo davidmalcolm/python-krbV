@@ -9,7 +9,7 @@
  * Written by Elliot Lee <sopwith@redhat.com>
  * Not completely tested (yet).
  */
-#define KRB5_PRIVATE 1
+
 #include "krb5module.h"
 #include "krb5err.h"
 #include "krb5util.h"
@@ -20,6 +20,8 @@
 #include <sys/socket.h>
 #include <sys/param.h>
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <stdio.h>
@@ -763,22 +765,35 @@ make_authdata_list(krb5_authdata **authdata)
 }
 
 static PyObject *
-make_address_list(krb5_address **caddrs)
+make_address_list(krb5_address **caddrs, int readable)
 {
   PyObject *retval;
-  int i, n;
+  int i, n, outlen;
+  char out[INET6_ADDRSTRLEN];
 
-  if(!caddrs)
-    {
-      Py_INCREF(Py_None);
-      return Py_None;
-    }
+  if (!caddrs) {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
 
-  for(n = 0; caddrs[n]; n++) /* */;
+  for (n = 0; caddrs[n]; n++) /* */;
   retval = PyTuple_New(n);
-  for(i = 0; i < n; i++)
+  for (i = 0; i < n; i++) {
+    memset(out, 0, INET6_ADDRSTRLEN);
+    if (readable) {
+      if (caddrs[i]->addrtype == ADDRTYPE_INET) {
+	inet_ntop(AF_INET, caddrs[i]->contents, out, INET6_ADDRSTRLEN);
+      } else if (caddrs[i]->addrtype == ADDRTYPE_INET6) {
+	inet_ntop(AF_INET6, caddrs[i]->contents, out, INET6_ADDRSTRLEN);
+      }
+      outlen = strlen(out);
+    } else {
+      memcpy(out, caddrs[i]->contents, caddrs[i]->length);
+      outlen = caddrs[i]->length;
+    }
     PyTuple_SetItem(retval, i,
-		    Py_BuildValue("(iz#)", caddrs[i]->addrtype, caddrs[i]->contents, caddrs[i]->length));
+		    Py_BuildValue("(iz#)", caddrs[i]->addrtype, out, strlen(out)));
+  }
 
   return retval;
 }
@@ -967,7 +982,7 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
 			  princtmp,
 			  make_transited(&ticket->enc_part2->transited),
 			  make_ticket_times(&ticket->enc_part2->times),
-			  make_address_list(ticket->enc_part2->caddrs),
+			  make_address_list(ticket->enc_part2->caddrs, 0),
 			  make_authdata_list(ticket->enc_part2->authorization_data));
       PyTuple_SetItem(retval, 3, tmp);
     }
@@ -1530,76 +1545,23 @@ pk_context_make_class(PyObject *module)
   return retval;
 }
 
-/* Convert a krb5_address to a string representation. */
-static PyObject *
-addr_to_str(krb5_address *kaddr)
-{
-  const char* ret = NULL;
-  char *addr = NULL;
-
-  if (kaddr->addrtype == ADDRTYPE_INET)
-    {
-      addr = alloca(INET_ADDRSTRLEN);
-      ret = inet_ntop(AF_INET, kaddr->contents,
-		       addr, INET_ADDRSTRLEN);
-    }
-  else if (kaddr->addrtype == ADDRTYPE_INET6)
-    {
-      addr = alloca(INET6_ADDRSTRLEN);
-      ret = inet_ntop(AF_INET6, kaddr->contents,
-		       addr, INET6_ADDRSTRLEN);
-    }
-
-  if (addr == NULL || ret == NULL)
-    {
-      return NULL;
-    }
-  else
-    {
-      return PyString_FromString(addr);
-    }
-}
-
-typedef struct addr_storage
-{
-  struct in_addr ip4;
-  struct in6_addr ip6;
-} addr_storage;
-
 /* Convert a string representation of an address to a krb5_address */
 static int
-str_to_addr(const char* address, krb5_address *krb5addr, addr_storage *as)
+str_to_addr(const char* address, krb5_address *krb5addr)
 {
-  struct in_addr ipv4addr;
+  struct in_addr  ipv4addr;
   struct in6_addr ipv6addr;
 
   /* First try ipv4, and if that fails, try ipv6 */
   if (inet_pton(AF_INET, address, &ipv4addr)) {
     krb5addr->addrtype = ADDRTYPE_INET;
-    as->ip4 = ipv4addr;
-    krb5addr->length = sizeof(as->ip4.s_addr);
-    krb5addr->contents = (krb5_octet *) &(as->ip4.s_addr);
+    krb5addr->length = sizeof(ipv4addr.s_addr);
+    memcpy(krb5addr->contents, &ipv4addr.s_addr, sizeof(ipv4addr.s_addr));
     return 1;
   } else if (inet_pton(AF_INET6, address, &ipv6addr)) {
     krb5addr->addrtype = ADDRTYPE_INET6;
-    as->ip6 = ipv6addr;
-    krb5addr->length = sizeof(as->ip6.s6_addr);
-    krb5addr->contents = (krb5_octet *) &(as->ip6.s6_addr);
-    return 1;
-  }
-
-  return 0;
-}
-
-/* Convert an unsigned short port to a krb5_address */
-static int
-port_to_addr(unsigned short port, krb5_address *krb5addr)
-{
-  /* If port == 0, don't set anything and return 0 */
-  if (port > 0) {
-    krb5addr->addrtype = ADDRTYPE_IPPORT;
-    krb5addr->length = sizeof(port);
-    krb5addr->contents = (krb5_octet *) &port;
+    krb5addr->length = sizeof(ipv6addr.s6_addr);
+    memcpy(krb5addr->contents, &ipv6addr.s6_addr, sizeof(ipv6addr.s6_addr));
     return 1;
   }
 
@@ -1665,52 +1627,15 @@ AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
     }
   else if(!strcmp(name, "addrs"))
     {
-      PyObject *ra1, *ra2, *laddr, *raddr;
-      krb5_address *a1=NULL, *a2=NULL;
-      rc = krb5_auth_con_getaddrs(ctx, ac, &a1, &a2);
-      if(rc)
+      krb5_address **addrs = malloc(sizeof(krb5_address *) * 3);
+      memset(addrs, 0, sizeof(krb5_address *) * 3);
+      rc = krb5_auth_con_getaddrs(ctx, ac, &addrs[0], &addrs[1]);
+      if (rc)
 	return pk_error(rc);
-      if(a1)
-	{
-	  laddr = addr_to_str(a1);
-	  if (laddr == NULL)
-	    {
-	      laddr = Py_None;
-	      Py_INCREF(Py_None);
-	    }
-	  
-	  ra1 = PyTuple_New(2);
-	  PyTuple_SetItem(ra1, 0, PyInt_FromLong(a1->addrtype));
-	  PyTuple_SetItem(ra1, 1, laddr);
-	  krb5_free_address(ctx, a1);
-	}
-      else
-	{
-	  ra1 = Py_None;
-	  Py_INCREF(ra1);
-	}
-      if(a2)
-	{
-	  raddr = addr_to_str(a2);
-	  if (raddr == NULL)
-	    {
-	      raddr = Py_None;
-	      Py_INCREF(Py_None);
-	    }
 
-	  ra2 = PyTuple_New(2);
-	  PyTuple_SetItem(ra2, 0, PyInt_FromLong(a2->addrtype));
-	  PyTuple_SetItem(ra2, 1, raddr);
-	  krb5_free_address(ctx, a2);
-	}
-      else
-	{
-	  ra2 = Py_None;
-	  Py_INCREF(ra2);
-	}
-      retval = PyTuple_New(2);
-      PyTuple_SetItem(retval, 0, ra1);
-      PyTuple_SetItem(retval, 1, ra2);
+      retval = make_address_list(addrs, 1);
+      
+      krb5_free_addresses(ctx, addrs);
     }
   else
     {
@@ -1820,50 +1745,60 @@ AuthContext_setattr(PyObject *unself __UNUSED, PyObject *args)
     }
   else if(!strcmp(name, "addrs"))
     {
-      krb5_address localaddr, remoteaddr, localport, remoteport;
-      krb5_address *la = NULL, *ra = NULL, *lp = NULL, *rp = NULL;
-      unsigned int lport, rport;
+      krb5_address *localaddr = NULL, *remoteaddr = NULL, *localport = NULL, *remoteport = NULL;
       char *laddr, *raddr;
-      addr_storage local_as, remote_as;
+      unsigned int lport, rport;
     
-      if(!PyArg_ParseTuple(value, "zIzI", &laddr, &lport, &raddr, &rport))
+      if (!PyArg_ParseTuple(value, "zIzI", &laddr, &lport, &raddr, &rport))
         return NULL;
       
-      if(laddr) {
-        if (str_to_addr(laddr, &localaddr, &local_as)) {
-          la = &localaddr;
-        } else { 
+      if (laddr) {
+	localaddr = alloca(sizeof(krb5_address));
+	memset(localaddr, 0, sizeof(krb5_address));
+	localaddr->contents = (krb5_octet *) alloca(sizeof(struct in6_addr));
+        if (!str_to_addr(laddr, localaddr)) {
           PyErr_Format(PyExc_AttributeError, "invalid address: %.400s", laddr);
           return NULL;         
         }
       }
 
-      if(raddr) {
-        if (str_to_addr(raddr, &remoteaddr, &remote_as)) {
-          ra = &remoteaddr;
-        } else {
+      if (raddr) {
+	remoteaddr = alloca(sizeof(krb5_address));
+	memset(remoteaddr, 0, sizeof(krb5_address));
+	remoteaddr->contents = (krb5_octet *) alloca(sizeof(struct in6_addr));
+        if (!str_to_addr(raddr, remoteaddr)) {
           PyErr_Format(PyExc_AttributeError, "invalid address: %.400s", raddr);
           return NULL;          
         }
       }
 
-      if(lport > 65535 || rport > 65535) {
+      if (lport > 65535 || rport > 65535) {
         PyErr_Format(PyExc_AttributeError, "port numbers cannot be greater than 65535");
         return NULL;
       }
 
-      if (port_to_addr((unsigned short) lport, &localport))
-        lp = &localport;
-        
-      if (port_to_addr((unsigned short) rport, &remoteport))
-        rp = &remoteport;
-      
-      rc = krb5_auth_con_setaddrs(ctx, ac, la, ra);
-      if(rc)
+      if (lport > 0) {
+	localport = alloca(sizeof(krb5_address));
+	memset(localport, 0, sizeof(krb5_address));
+	localport->addrtype = ADDRTYPE_IPPORT;
+	localport->length = sizeof(lport);
+	localport->contents = (krb5_octet *) &lport;
+      }
+
+      if (rport > 0) {
+	remoteport = alloca(sizeof(krb5_address));
+	memset(remoteport, 0, sizeof(krb5_address));
+	remoteport->addrtype = ADDRTYPE_IPPORT;
+	remoteport->length = sizeof(rport);
+	remoteport->contents = (krb5_octet *) &rport;
+      }
+
+      rc = krb5_auth_con_setaddrs(ctx, ac, localaddr, remoteaddr);
+      if (rc)
         return pk_error(rc);
 
-      rc = krb5_auth_con_setports(ctx, ac, lp, rp);
-      if(rc)
+      rc = krb5_auth_con_setports(ctx, ac, localport, remoteport);
+      if (rc)
         return pk_error(rc);
     }
   else if((!strcmp(name, "context") && ctx) || 
@@ -3300,7 +3235,7 @@ CCache_get_credentials(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   else
     Py_INCREF(client);
 
-  addrlist = make_address_list(out_creds->addresses);
+  addrlist = make_address_list(out_creds->addresses, 0);
 
   adlist = make_authdata_list(out_creds->authdata);
 
