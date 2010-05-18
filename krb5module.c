@@ -1462,32 +1462,33 @@ then rd_rep() should also return the modified AuthContext parameter.        \n\
 static PyObject*
 Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
-  krb5_context kctx = NULL;
+  krb5_context kctx;
   PyObject *ctx, *self, *auth_context = NULL, *in_data, *tmp, *retval;
   krb5_auth_context ac;
   krb5_data inbuf;
   krb5_error_code rc = 0;
-  krb5_ap_rep_enc_part *repl = NULL;
+  krb5_ap_rep_enc_part *repl;
 
-  if(!PyArg_ParseTuple(args, "OO!:rd_rep", &self, &PyString_Type, &in_data))
+  if (!PyArg_ParseTuple(args, "OO!:rd_rep", &self, &PyString_Type, &in_data))
     return NULL;
 
   ctx = PyObject_GetAttrString(self, "_ctx");
   kctx = PyCObject_AsVoidPtr(ctx);
 
-  if(kw && PyDict_Check(kw))
+  if (kw && PyDict_Check(kw))
     auth_context = PyDict_GetItemString(kw, "auth_context");
-  if(!auth_context || !PyObject_IsInstance(auth_context, auth_context_class))
-    {
-      PyErr_Format(PyExc_TypeError, "auth_context keyword argument required");
-      return NULL;
-    }
+  if (!auth_context || !PyObject_IsInstance(auth_context, auth_context_class)) {
+    PyErr_Format(PyExc_TypeError, "auth_context keyword argument required");
+    return NULL;
+  }
   tmp = PyObject_GetAttrString(auth_context, "_ac");
   ac = PyCObject_AsVoidPtr(tmp);
 
   inbuf.data = PyString_AsString(in_data);
   inbuf.length = PyString_Size(in_data);
+
   rc = krb5_rd_rep(kctx, ac, &inbuf, &repl);
+
   if(rc)
     return pk_error(rc);
 
