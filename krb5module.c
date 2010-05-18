@@ -27,11 +27,6 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 
-#if !defined(_KRB5_INT_H) && defined(KRB5_PROTOTYPE)
-krb5_error_code krb5_get_krbhst KRB5_PROTOTYPE((krb5_context, const krb5_data *, char ***));
-krb5_error_code krb5_free_krbhst KRB5_PROTOTYPE((krb5_context, char * const *));
-#endif
-
 static PyObject *pk_default_context(PyObject *self, PyObject *unused_args);
 static void destroy_ac(void *cobj, void *desc);
 static void destroy_principal(void *cobj, void *desc);
@@ -321,7 +316,7 @@ Context_rc_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 } /* KrbV.Context.default_rcache() */
 
 PyDoc_STRVAR(Context_kt_default__doc__,
-"default_keytab(context) -> KrbV.Context.RCache object                       \n\
+"default_keytab(context) -> KrbV.Context.Keytab object                       \n\
                                                                              \n\
 :Summary : Retrieve the default key-table object from the current,           \n\
            Kerberos context or from the default keytab-file, if necessary.   \n\
@@ -1429,7 +1424,7 @@ Context_mk_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 } /* KrbV.Context.mk_rep() */
 
 PyDoc_STRVAR(Context_rd_rep__doc__,
-"rd_rep(in_data, auth_context) -> 'None'                                    \n\
+"rd_rep(in_data, auth_context) -> AP_REP tuple                              \n\
                                                                             \n\
 :Parameters :                                                               \n\
     in_data : buffer                                                        \n\
@@ -1458,7 +1453,8 @@ exactly the encrypted timestamp that the client originally sent in the      \n\
 handshake's initial AP_REQ message.                                         \n\
                                                                             \n\
 :Return value:                                                              \n\
-None.  BUG: rd_rep() should return at least a string containing the AP_REP  \n\
+A tuple containing the contents of the contents of the AP_REP message.      \n\
+BUG: rd_rep() should return at least a string containing the AP_REP         \n\
 message's contents, so that the client can confirm the server's echoed      \n\
 timestamp.  If these four routines {rd,mk}_re{p,q} are to support subkeys,  \n\
 then rd_rep() should also return the modified AuthContext parameter.        \n\
@@ -1467,7 +1463,7 @@ static PyObject*
 Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
-  PyObject *ctx, *self, *auth_context = NULL, *in_data, *tmp;
+  PyObject *ctx, *self, *auth_context = NULL, *in_data, *tmp, *retval;
   krb5_auth_context ac;
   krb5_data inbuf;
   krb5_error_code rc = 0;
@@ -1495,10 +1491,14 @@ Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if(rc)
     return pk_error(rc);
 
+  retval = Py_BuildValue("(iiNI)",
+			 repl->ctime, repl->cusec,
+			 make_keyblock(repl->subkey),
+			 repl->seq_number);
+
   krb5_free_ap_rep_enc_part(kctx, repl);
 
-  Py_INCREF(Py_None);
-  return Py_None;
+  return retval;
 } /* KrbV.Context.rd_rep() */
 
 static PyMethodDef context_methods[] = {
@@ -1584,6 +1584,7 @@ PyDoc_STRVAR(AuthContext_getattr__doc__,
 	       KRB5_AUTH_CONTEXT_RET_TIME	Save timestamps to output structure       \n\
 	       KRB5_AUTH_CONTEXT_DO_SEQUENCE	Use sequence numbers                      \n\
 	       KRB5_AUTH_CONTEXT_RET_SEQUENCE	Copy sequence numbers to output structure \n\
+    * key    : tuple containing the keyblock contents                           \n\
                                                                                 \n\
 :Return value :                                                                 \n\
     NULL   means 'invalid attribute,'                                           \n\
@@ -1601,48 +1602,51 @@ AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
   if(!PyArg_ParseTuple(args, "Os:__getattr__", &self, &name))
     return NULL;
 
-  if(strcmp(name, "context") && strcmp(name, "_ac"))
-    {
-      tmp = PyObject_GetAttrString(self, "context");
-      if(tmp)
-	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
-	}
-      tmp = PyObject_GetAttrString(self, "_ac");
-      if(tmp)
-	ac = PyCObject_AsVoidPtr(tmp);
+  if (strcmp(name, "context") && strcmp(name, "_ac")) {
+    tmp = PyObject_GetAttrString(self, "context");
+    if (tmp) {
+      tmp = PyObject_GetAttrString(tmp, "_ctx");
+      if (tmp)
+	ctx = PyCObject_AsVoidPtr(tmp);
     }
+    tmp = PyObject_GetAttrString(self, "_ac");
+    if (tmp)
+      ac = PyCObject_AsVoidPtr(tmp);
+  }
 
   PyErr_Clear();
   
-  if(!strcmp(name, "flags"))
-    {
-      krb5_int32 flags;
-      rc = krb5_auth_con_getflags(ctx, ac, &flags);
-      if(rc)
-	return pk_error(rc);
-      retval = PyInt_FromLong(flags);
-    }
-  else if(!strcmp(name, "addrs"))
-    {
-      krb5_address **addrs = malloc(sizeof(krb5_address *) * 3);
-      memset(addrs, 0, sizeof(krb5_address *) * 3);
-      rc = krb5_auth_con_getaddrs(ctx, ac, &addrs[0], &addrs[1]);
-      if (rc)
-	return pk_error(rc);
+  if (!strcmp(name, "flags")) {
+    krb5_int32 flags;
+    rc = krb5_auth_con_getflags(ctx, ac, &flags);
+    if (rc)
+      return pk_error(rc);
+    retval = PyInt_FromLong(flags);
+  } else if (!strcmp(name, "addrs")) {
+    krb5_address **addrs = malloc(sizeof(krb5_address *) * 3);
+    memset(addrs, 0, sizeof(krb5_address *) * 3);
+    rc = krb5_auth_con_getaddrs(ctx, ac, &addrs[0], &addrs[1]);
+    if (rc)
+      return pk_error(rc);
 
-      retval = make_address_list(addrs, 1);
+    retval = make_address_list(addrs, 1);
       
-      krb5_free_addresses(ctx, addrs);
-    }
-  else
-    {
-      PyErr_Format(PyExc_AttributeError, "%.50s instance has no attribute '%.400s'",
-		   PyString_AS_STRING(((PyInstanceObject *)self)->in_class->cl_name), name);
-      retval = NULL;
-    }
+    krb5_free_addresses(ctx, addrs);
+  } else if (!strcmp(name, "key")) {
+    krb5_keyblock *key = NULL;
+    rc = krb5_auth_con_getkey(ctx, ac, &key);
+    if (rc)
+      return pk_error(rc);
+
+    retval = make_keyblock(key);
+
+    if (key)
+      krb5_free_keyblock(ctx, key);
+  } else {
+    PyErr_Format(PyExc_AttributeError, "%.50s instance has no attribute '%.400s'",
+		 PyString_AS_STRING(((PyInstanceObject *)self)->in_class->cl_name), name);
+    retval = NULL;
+  }
 
   return retval;
 }
