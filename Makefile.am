@@ -16,3 +16,6 @@ krb5defines.h: $(DEFFILES) gendefines.awk
 EXTRA_DIST=gendefines.awk python-krbV.spec krbV-code-snippets.py
 BUILT_SOURCES=krb5defines.h
 CLEANFILES=krb5defines.h
+
+tag: python-krbV.spec
+	git tag -s $$(rpm -q --qf '%{name}-%{version}\n' --specfile python-krbV.spec | head -1)
