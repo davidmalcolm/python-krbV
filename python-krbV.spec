@@ -8,8 +8,8 @@ Summary: Python extension module for Kerberos 5
 Group: Development/Languages
 License: LGPLv2+
 
-URL: http://people.redhat.com/mikeb/python-krbV
-Source: http://people.redhat.com/mikeb/python-krbV/python-krbV-%{version}.tar.gz
+URL: http://fedorahosted.org/python-krbV/
+Source: http://fedorahosted.org/python-krbV/attachment/wiki/Releases/python-krbV-%{version}.tar.bz2
 
 BuildRequires: python-devel
 BuildRequires: krb5-devel >= 1.2.2
@@ -18,7 +18,7 @@ BuildRequires: /bin/awk
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 %description
-python-krbV allows python programs to use Kerberos 5 authentication/security.
+python-krbV allows python programs to use Kerberos 5 authentication and security.
 
 %prep
 %setup -q
