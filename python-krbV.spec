@@ -2,7 +2,7 @@
 
 Name: python-krbV
 Version: 1.0.90
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: Python extension module for Kerberos 5
 
 Group: Development/Languages
@@ -39,10 +39,13 @@ export CFLAGS="%{optflags} -Wextra"
 
 %files
 %defattr(-,root,root,-)
-%doc README COPYING krbV-code-snippets.py
+%doc README COPYING krbV-code-snippets.py python-krbV-test.py
 %{python_sitearch}/krbVmodule.so
 
 %changelog
+* Mon Jul 12 2010 Mike Bonnet <mikeb@redhat.com> - 1.0.90-2
+- Add test script
+
 * Tue May 18 2010 Mike Bonnet <mikeb@redhat.com> - 1.0.90-1
 - return the contents of the AP_REP message from rd_rep()
 - improved memory handling
