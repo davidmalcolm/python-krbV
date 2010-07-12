@@ -40,7 +40,7 @@ def handle_udp(opts, sock):
                                              auth_context=ac,
                                              options=krbV.AP_OPTS_MUTUAL_REQUIRED)
     cprinc = ccreds[2]
-    print 'Successfully authenticated via tcp: %s' % cprinc.name
+    print 'Successfully authenticated via udp: %s' % cprinc.name
     rep = ctx.mk_rep(auth_context=ac)
     sock.sendto(rep, addr)
     msg_enc, addr = sock.recvfrom(4096)
