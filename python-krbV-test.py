@@ -62,6 +62,8 @@ def handle_connections(opts, socklist):
                     handle_udp(opts, sock)
                 else:
                     raise ValueError, 'unknown socket type: %s' % sock.type
+        except krbV.Krb5Error, e:
+            print >> sys.stderr, 'krbV.Krb5Error:', e
         except socket.timeout:
             pass
         except KeyboardInterrupt:
@@ -159,6 +161,7 @@ def client(opts):
     tcp_client(opts, tcpsock)
 
     udpsock = socket.socket(opts.addr_family, socket.SOCK_DGRAM)
+    udpsock.settimeout(15)
     udp_client(opts, udpsock, opts.serveraddr)
 
 
