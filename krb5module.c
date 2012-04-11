@@ -33,6 +33,113 @@ static void destroy_principal(void *cobj, void *desc);
 
 static PyObject *krb5_module, *context_class, *auth_context_class, *principal_class, *ccache_class, *rcache_class, *keytab_class;
 
+/* Helper methods for getting at wrapped data */
+static krb5_context
+Context_get_krb5_context(PyObject *self)
+{
+  krb5_context kctx = NULL;
+  PyObject *ctx = PyObject_GetAttrString(self, "_ctx");
+  if (ctx) {
+    kctx = PyCObject_AsVoidPtr(ctx);
+    Py_DECREF(ctx);
+    return kctx;
+  } else {
+    return NULL;
+  }
+}
+
+static krb5_auth_context
+AuthContext_get_krb5_auth_context(PyObject *auth_context)
+{
+  krb5_auth_context ac_out;
+  PyObject *tmp;
+
+  tmp = PyObject_GetAttrString(auth_context, "_ac");
+  ac_out = PyCObject_AsVoidPtr(tmp);
+  Py_DECREF(tmp);
+  return ac_out;
+
+}
+
+static krb5_context
+Principal_get_krb5_context(PyObject *self)
+{
+  PyObject *tmp;
+  tmp = PyObject_GetAttrString(self, "context");
+  if(tmp)
+    {
+      krb5_context result = Context_get_krb5_context(tmp);
+      Py_DECREF(tmp);
+      return result;
+    }
+  else
+    return NULL;
+}
+
+static krb5_principal
+Principal_get_krb5_principal(PyObject *self)
+{
+  PyObject *tmp;
+  tmp = PyObject_GetAttrString(self, "_princ");
+  if(tmp)
+    {
+      krb5_principal result = PyCObject_AsVoidPtr(tmp);
+      Py_DECREF(tmp);
+      return result;
+    }
+  else
+    return NULL;
+}
+
+static krb5_ccache
+CCache_get_krb5_ccache(PyObject *self)
+{
+  PyObject *tmp;
+
+  tmp = PyObject_GetAttrString(self, "_ccache");
+  if(tmp)
+    {
+      krb5_ccache ccache = PyCObject_AsVoidPtr(tmp);
+      Py_DECREF(tmp);
+      return ccache;
+    }
+
+  return NULL;
+}
+
+krb5_rcache
+RCache_get_krb5_rcache(PyObject *self)
+{
+  PyObject *tmp;
+  krb5_rcache rcache;
+
+  tmp = PyObject_GetAttrString(self, "_rcache");
+  if (tmp)
+    {
+      rcache = PyCObject_AsVoidPtr(tmp);
+      Py_DECREF(tmp);
+      return rcache;
+    }
+
+  return NULL;
+}
+
+static krb5_keytab
+Keytab_get_krb5_keytab(PyObject *self)
+{
+  PyObject *tmp;
+
+  tmp = PyObject_GetAttrString(self, "_keytab");
+  if(tmp)
+    {
+      krb5_keytab kt = PyCObject_AsVoidPtr(tmp);
+      Py_DECREF(tmp);
+      return kt;
+    }
+
+  return NULL;
+}
+
 PyDoc_STRVAR(Context_init__doc__,
 "__init__() -> KrbV.Context                                                  \n\
                                                                              \n\
@@ -101,11 +208,7 @@ Context_getattr(PyObject *unself __UNUSED, PyObject *args)
 
   if(strcmp(name, "_ctx"))
     {
-      PyObject *ctx;
-      ctx = PyObject_GetAttrString(self, "_ctx");
-      if(!ctx)
-	return NULL;
-      kctx = PyCObject_AsVoidPtr(ctx);
+      kctx = Context_get_krb5_context(self);
       if(!kctx)
 	return NULL;
     }
@@ -159,11 +262,7 @@ Context_setattr(PyObject *unself __UNUSED, PyObject *args)
 
   if(strcmp(name, "_ctx"))
     {
-      PyObject *ctx;
-      ctx = PyObject_GetAttrString(self, "_ctx");
-      if(!ctx)
-	return NULL;
-      kctx = PyCObject_AsVoidPtr(ctx);
+      kctx = Context_get_krb5_context(self);
       if(!kctx)
 	return NULL;
     }
@@ -479,8 +578,8 @@ KrbV.AuthContext methods : mk_priv(), rd_priv()                              \n\
 static PyObject*
 Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
 {
-  krb5_context kctx = NULL;
-  PyObject *ctx, *retval, *self, *in_data = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *tmp,
+  krb5_context kctx;
+  PyObject *retval, *self, *in_data = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *tmp,
     *auth_context = NULL, *credso = NULL;
   krb5_auth_context ac_out = NULL;
   krb5_data outbuf, inbuf;
@@ -504,8 +603,7 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
 				  &credso))
     return NULL;
 
-  ctx = PyObject_GetAttrString(self, "_ctx");
-  kctx = PyCObject_AsVoidPtr(ctx);
+  kctx = Context_get_krb5_context(self);
 
   if(in_data)
     {
@@ -545,8 +643,7 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
       Py_DECREF(subargs);
       free_ccacheo = 1;
     }
-  tmp = PyObject_GetAttrString(ccacheo, "_ccache");
-  ccache = PyCObject_AsVoidPtr(tmp);
+  ccache = CCache_get_krb5_ccache(ccacheo);
   if(free_ccacheo)
     {
       Py_DECREF(ccacheo);
@@ -554,8 +651,7 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
 
   if(client && client != Py_None)
     {
-      tmp = PyObject_GetAttrString(client, "_princ");
-      pclient = PyCObject_AsVoidPtr(tmp);
+      pclient = Principal_get_krb5_principal(client);
     }
   else
     {
@@ -573,8 +669,7 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
 
   if(server && server != Py_None)
     {
-      tmp = PyObject_GetAttrString(server, "_princ");
-      pserver = PyCObject_AsVoidPtr(tmp);
+      pserver = Principal_get_krb5_principal(server);
     }
   else
     {
@@ -597,10 +692,7 @@ Context_mk_req(PyObject *unself, PyObject *args, PyObject *kw)
     }
 
   if(auth_context)
-    {
-      tmp = PyObject_GetAttrString(auth_context, "_ac");
-      ac_out = PyCObject_AsVoidPtr(tmp);
-    }
+    ac_out = AuthContext_get_krb5_auth_context(auth_context);
 
   rc = krb5_mk_req_extended(kctx, &ac_out, ap_req_options, &inbuf, credsptr, &outbuf);
   if(credsp)
@@ -860,7 +952,7 @@ static PyObject*
 Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
-  PyObject *ctx, *retval, *self, *server = NULL, *keytab = NULL, *tmp, *auth_context = NULL;
+  PyObject *retval, *self, *server = NULL, *keytab = NULL, *tmp, *auth_context = NULL;
   krb5_auth_context ac_out = NULL;
   krb5_data inbuf;
   krb5_keytab kt = NULL;
@@ -875,16 +967,12 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
 				  &self, &inbuf.data, &inbuf.length, &ap_req_options, &server, &keytab, &auth_context))
     return NULL;
 
-  ctx = PyObject_GetAttrString(self, "_ctx");
-  kctx = PyCObject_AsVoidPtr(ctx);
+  kctx = Context_get_krb5_context(self);
 
   assert(!check_obj(args));
   
   if(auth_context)
-    {
-      tmp = PyObject_GetAttrString(auth_context, "_ac");
-      ac_out = PyCObject_AsVoidPtr(tmp);
-    }
+    ac_out = AuthContext_get_krb5_auth_context(auth_context);
 
   if(keytab == Py_None)
     {
@@ -896,8 +984,7 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
     }
   if(keytab)
     {
-      tmp = PyObject_GetAttrString(keytab, "_keytab");
-      kt = PyCObject_AsVoidPtr(tmp);
+      kt = Keytab_get_krb5_keytab(keytab);
       if(free_keytab)
 	{
 	  Py_DECREF(keytab);
@@ -906,8 +993,7 @@ Context_rd_req(PyObject *unself, PyObject *args, PyObject *kw)
 
   if(server)
     {
-      tmp = PyObject_GetAttrString(server, "_princ");
-      pserver = PyCObject_AsVoidPtr(tmp);
+      pserver = Principal_get_krb5_principal(server);
     }
 
   assert(!check_obj(args));
@@ -1063,7 +1149,7 @@ static PyObject*
 Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
-  PyObject *ctx, *retval, *self, *fd_obj = NULL, *options = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *tmp, *in_data = NULL;
+  PyObject *retval, *self, *fd_obj = NULL, *options = NULL, *server = NULL, *client = NULL, *ccacheo = NULL, *in_data = NULL;
   krb5_auth_context ac_out = NULL;
   krb5_ccache ccache;
   krb5_principal pclient, pserver;
@@ -1083,9 +1169,7 @@ Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
   if(fd < 0)
     return NULL;
   
-  ctx = PyObject_GetAttrString(self, "_ctx");
-  kctx = PyCObject_AsVoidPtr(ctx);
-
+  kctx = Context_get_krb5_context(self);
   if(kw)
     {
       options = PyDict_GetItemString(kw, "options");
@@ -1103,16 +1187,14 @@ Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
       Py_DECREF(subargs);
       free_ccacheo = 1;
     }
-  tmp = PyObject_GetAttrString(ccacheo, "_ccache");
-  ccache = PyCObject_AsVoidPtr(tmp);
+  ccache = CCache_get_krb5_ccache(ccacheo);
   if(free_ccacheo)
     {
       Py_DECREF(ccacheo);
     }
   if(client)
     {
-      tmp = PyObject_GetAttrString(client, "_princ");
-      pclient = PyCObject_AsVoidPtr(tmp);
+      pclient = Principal_get_krb5_principal(client);
     }
   else
     {
@@ -1124,8 +1206,7 @@ Context_sendauth(PyObject *unself, PyObject *args, PyObject *kw)
 
   if(server)
     {
-      tmp = PyObject_GetAttrString(server, "_princ");
-      pserver = PyCObject_AsVoidPtr(tmp);
+      pserver = Principal_get_krb5_principal(server);
     }
   else
     {
@@ -1240,7 +1321,7 @@ static PyObject*
 Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
-  PyObject *ctx, *retval, *self, *fd_obj, *server = NULL, *keytab = NULL, *tmp, *options = NULL;
+  PyObject *retval, *self, *fd_obj, *server = NULL, *keytab = NULL, *options = NULL;
   krb5_auth_context ac_out = NULL;
   krb5_keytab kt;
   krb5_principal pserver;
@@ -1259,8 +1340,7 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
   if(fd < 0)
     return NULL;
 
-  ctx = PyObject_GetAttrString(self, "_ctx");
-  kctx = PyCObject_AsVoidPtr(ctx);
+  kctx = Context_get_krb5_context(self);
 
   if(kw)
     {
@@ -1277,8 +1357,7 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
       Py_DECREF(subargs);
       free_keytab = 1;
     }
-  tmp = PyObject_GetAttrString(keytab, "_keytab");
-  kt = PyCObject_AsVoidPtr(tmp);
+  kt = Keytab_get_krb5_keytab(keytab);
   if(free_keytab)
     {
       Py_DECREF(keytab);
@@ -1286,8 +1365,7 @@ Context_recvauth(PyObject *unself, PyObject *args, PyObject *kw)
 
   if(server)
     {
-      tmp = PyObject_GetAttrString(server, "_princ");
-      pserver = PyCObject_AsVoidPtr(tmp);
+      pserver = Principal_get_krb5_principal(server);
     }
   else
     {
@@ -1380,7 +1458,7 @@ static PyObject*
 Context_mk_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context kctx = NULL;
-  PyObject *ctx, *retval, *self, *auth_context = NULL, *tmp;
+  PyObject *retval, *self, *auth_context = NULL;
   krb5_auth_context ac;
   krb5_data outbuf;
   krb5_error_code rc = 0;
@@ -1388,8 +1466,7 @@ Context_mk_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if(!PyArg_ParseTuple(args, "O:mk_rep", &self))
     return NULL;
 
-  ctx = PyObject_GetAttrString(self, "_ctx");
-  kctx = PyCObject_AsVoidPtr(ctx);
+  kctx = Context_get_krb5_context(self);
 
   if(kw && PyDict_Check(kw))
     auth_context = PyDict_GetItemString(kw, "auth_context");
@@ -1398,8 +1475,7 @@ Context_mk_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
       PyErr_Format(PyExc_TypeError, "auth_context keyword argument required");
       return NULL;
     }
-  tmp = PyObject_GetAttrString(auth_context, "_ac");
-  ac = PyCObject_AsVoidPtr(tmp);
+  ac = AuthContext_get_krb5_auth_context(auth_context);
 
   rc = krb5_mk_rep(kctx, ac, &outbuf);
   if(rc)
@@ -1451,7 +1527,7 @@ static PyObject*
 Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context kctx;
-  PyObject *ctx, *self, *auth_context = NULL, *in_data, *tmp, *retval;
+  PyObject *self, *auth_context = NULL, *in_data, *retval;
   krb5_auth_context ac;
   krb5_data inbuf;
   krb5_error_code rc = 0;
@@ -1460,8 +1536,7 @@ Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if (!PyArg_ParseTuple(args, "OO!:rd_rep", &self, &PyString_Type, &in_data))
     return NULL;
 
-  ctx = PyObject_GetAttrString(self, "_ctx");
-  kctx = PyCObject_AsVoidPtr(ctx);
+  kctx = Context_get_krb5_context(self);
 
   if (kw && PyDict_Check(kw))
     auth_context = PyDict_GetItemString(kw, "auth_context");
@@ -1469,8 +1544,7 @@ Context_rd_rep(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
     PyErr_Format(PyExc_TypeError, "auth_context keyword argument required");
     return NULL;
   }
-  tmp = PyObject_GetAttrString(auth_context, "_ac");
-  ac = PyCObject_AsVoidPtr(tmp);
+  ac = AuthContext_get_krb5_auth_context(auth_context);
 
   inbuf.data = PyString_AsString(in_data);
   inbuf.length = PyString_Size(in_data);
@@ -1594,13 +1668,10 @@ AuthContext_getattr(PyObject *unself __UNUSED, PyObject *args)
   if (strcmp(name, "context") && strcmp(name, "_ac")) {
     tmp = PyObject_GetAttrString(self, "context");
     if (tmp) {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if (tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
+      ctx = Context_get_krb5_context(tmp);
+      Py_DECREF(tmp);
     }
-    tmp = PyObject_GetAttrString(self, "_ac");
-    if (tmp)
-      ac = PyCObject_AsVoidPtr(tmp);
+    ac = AuthContext_get_krb5_auth_context(self);
   }
 
   PyErr_Clear();
@@ -1699,14 +1770,11 @@ AuthContext_setattr(PyObject *unself __UNUSED, PyObject *args)
     {
       tmp = PyObject_GetAttrString(self, "context");
       if(tmp)
-	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
-	}
-      tmp = PyObject_GetAttrString(self, "_ac");
-      if(tmp)
-	ac = PyCObject_AsVoidPtr(tmp);
+        {
+          ctx = Context_get_krb5_context(tmp);
+          Py_DECREF(tmp);
+        }
+      ac = AuthContext_get_krb5_auth_context(self);
     }
 
   PyErr_Clear();
@@ -1731,9 +1799,7 @@ AuthContext_setattr(PyObject *unself __UNUSED, PyObject *args)
     {
       krb5_rcache rcache;
 
-      tmp = PyObject_GetAttrString(value, "_rcache");
-      assert(tmp);
-      rcache = PyCObject_AsVoidPtr(tmp);
+      rcache = RCache_get_krb5_rcache(value);
       rc = krb5_auth_con_setrcache(ctx, ac, rcache);
       if(rc)
 	return pk_error(rc);
@@ -1865,17 +1931,13 @@ AuthContext_rd_priv(PyObject *unself __UNUSED, PyObject *args)
   tmp = PyObject_GetAttrString(self, "context");
   if(tmp)
     {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
+      ctx = Context_get_krb5_context(tmp);
       if(!ctx)
 	return NULL;
     }
   else
     return NULL;
-  tmp = PyObject_GetAttrString(self, "_ac");
-  if(tmp)
-    ac = PyCObject_AsVoidPtr(tmp);
+  ac = AuthContext_get_krb5_auth_context(self);
   if(!ac)
     return NULL;
 
@@ -1933,17 +1995,13 @@ AuthContext_mk_priv(PyObject *unself __UNUSED, PyObject *args)
   tmp = PyObject_GetAttrString(self, "context");
   if(tmp)
     {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
+      ctx = Context_get_krb5_context(tmp);
       if(!ctx)
 	return NULL;
     }
   else
     return NULL;
-  tmp = PyObject_GetAttrString(self, "_ac");
-  if(tmp)
-    ac = PyCObject_AsVoidPtr(tmp);
+  ac = AuthContext_get_krb5_auth_context(self);
   if(!ac)
     return NULL;
 
@@ -2004,9 +2062,7 @@ AuthContext_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
-  cobj = PyObject_GetAttrString(conobj, "_ctx");
-  assert(cobj);
-  ctx = PyCObject_AsVoidPtr(cobj);
+  ctx = Context_get_krb5_context(conobj);
 
   if(!acobj)
     rc = krb5_auth_con_init(ctx, &ac);
@@ -2074,10 +2130,8 @@ AuthContext_genaddrs(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
     return NULL;
 
   tmp = PyObject_GetAttrString(self, "context");
-  tmp = PyObject_GetAttrString(tmp, "_ctx");
-  ctx = PyCObject_AsVoidPtr(tmp);
-  tmp = PyObject_GetAttrString(self, "_ac");
-  ac = PyCObject_AsVoidPtr(tmp);
+  ctx = Context_get_krb5_context(tmp);
+  ac = AuthContext_get_krb5_auth_context(self);
   
   fd = obj_to_fd(fh);
   if(fd < 0)
@@ -2163,14 +2217,11 @@ Principal_getattr(PyObject *unself __UNUSED, PyObject *args)
       tmp = PyObject_GetAttrString(self, "context");
       if(tmp)
 	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
+          ctx = Context_get_krb5_context(tmp);
+          Py_DECREF(tmp);
 	}
-      tmp = PyObject_GetAttrString(self, "_princ");
-      if(tmp)
-	princ = PyCObject_AsVoidPtr(tmp);
-      else
+      princ = Principal_get_krb5_principal(self);
+      if (!princ)
 	return NULL;
     }
 
@@ -2239,13 +2290,10 @@ Principal_setattr(PyObject *unself __UNUSED, PyObject *args)
       tmp = PyObject_GetAttrString(self, "context");
       if(tmp)
 	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
+          ctx = Context_get_krb5_context(tmp);
+          Py_DECREF(tmp);
 	}
-      tmp = PyObject_GetAttrString(self, "_princ");
-      if(tmp)
-	princ = PyCObject_AsVoidPtr(tmp);
+      princ = Principal_get_krb5_principal(self);
     }
 
   PyErr_Clear();
@@ -2322,9 +2370,7 @@ Principal_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
-  cobj = PyObject_GetAttrString(conobj, "_ctx");
-  assert(cobj);
-  ctx = PyCObject_AsVoidPtr(cobj);
+  ctx = Context_get_krb5_context(conobj);
 
   cobj = NULL;
   if(PyString_Check(princobj))
@@ -2379,10 +2425,11 @@ PyDoc_STRVAR(Principal_getitem__doc__,
     __getitem__() is a krb-internal routine, mostly used for comparing       \n\
     principals, and for reassembling the name-components.                    \n\
 ");
+
 static PyObject*
 Principal_getitem(PyObject *unself __UNUSED, PyObject *args)
 {
-  PyObject *self, *tmp, *retval;
+  PyObject *self, *retval;
   krb5_context ctx = NULL;
   krb5_principal princ = NULL;
   int index;
@@ -2391,21 +2438,11 @@ Principal_getitem(PyObject *unself __UNUSED, PyObject *args)
   if(!PyArg_ParseTuple(args, "Oi:__getitem__", &self, &index))
     return NULL;
 
-  tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
-    {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
-      else
-	return NULL;
-    }
-  else
+  ctx = Principal_get_krb5_context(self);
+  if (!ctx)
     return NULL;
-  tmp = PyObject_GetAttrString(self, "_princ");
-  if(tmp)
-    princ = PyCObject_AsVoidPtr(tmp);
-  else
+  princ = Principal_get_krb5_principal(self);
+  if (!princ)
     return NULL;
 
   if(index >= krb5_princ_size(ctx, princ))
@@ -2439,23 +2476,19 @@ PyDoc_STRVAR(Principal_itemlen__doc__,
 static PyObject*
 Principal_itemlen(PyObject *unself __UNUSED, PyObject *args)
 {
-  PyObject *self, *tmp;
+  PyObject *self;
   krb5_context ctx = NULL;
   krb5_principal princ = NULL;
 
   if(!PyArg_ParseTuple(args, "O:__len__", &self))
     return NULL;
 
-  tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
-    {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
-    }
-  tmp = PyObject_GetAttrString(self, "_princ");
-  if(tmp)
-    princ = PyCObject_AsVoidPtr(tmp);
+  ctx = Principal_get_krb5_context(self);
+  if (!ctx)
+    return NULL;
+  princ = Principal_get_krb5_principal(self);
+  if (!princ)
+    return NULL;
 
   return PyInt_FromLong(krb5_princ_size(ctx, princ));
 } /* KrbV.Principal.__len__() */
@@ -2476,7 +2509,7 @@ PyDoc_STRVAR(Principal_eq__doc__,
 static PyObject*
 Principal_eq(PyObject *unself __UNUSED, PyObject *args)
 {
-  PyObject *self, *tmp, *other;
+  PyObject *self, *other;
   krb5_context ctx = NULL;
   krb5_principal princ = NULL, otherprinc = NULL;
 
@@ -2488,17 +2521,9 @@ Principal_eq(PyObject *unself __UNUSED, PyObject *args)
       return NULL;
     }
 
-  tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
-    {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
-    }
-  tmp = PyObject_GetAttrString(self, "_princ");
-  princ = PyCObject_AsVoidPtr(tmp);
-  tmp = PyObject_GetAttrString(other, "_princ");
-  otherprinc = PyCObject_AsVoidPtr(tmp);
+  ctx = Principal_get_krb5_context(self);
+  princ = Principal_get_krb5_principal(self);
+  otherprinc = Principal_get_krb5_principal(other);
 
   if(krb5_principal_compare(ctx, princ, otherprinc))
     return PyInt_FromLong(1);
@@ -2519,7 +2544,7 @@ PyDoc_STRVAR(Principal_repr__doc__,
 static PyObject*
 Principal_repr(PyObject *unself __UNUSED, PyObject *args)
 {
-  PyObject *self, *tmp, *retval;
+  PyObject *self, *retval;
   krb5_context ctx = NULL;
   krb5_principal princ = NULL;
   char *outname, *outbuf;
@@ -2528,16 +2553,8 @@ Principal_repr(PyObject *unself __UNUSED, PyObject *args)
   if(!PyArg_ParseTuple(args, "O:__repr__", &self))
     return NULL;
 
-  tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
-    {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
-    }
-  tmp = PyObject_GetAttrString(self, "_princ");
-  if(tmp)
-    princ = PyCObject_AsVoidPtr(tmp);
+  ctx = Principal_get_krb5_context(self);
+  princ = Principal_get_krb5_principal(self);
 
   rc = krb5_unparse_name(ctx, princ, &outname);
   if(rc)
@@ -2622,13 +2639,10 @@ CCache_getattr(PyObject *unself __UNUSED, PyObject *args)
       tmp = PyObject_GetAttrString(self, "context");
       if(tmp)
 	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
+          ctx = Context_get_krb5_context(tmp);
+          Py_DECREF(tmp);
 	}
-      tmp = PyObject_GetAttrString(self, "_ccache");
-      if(tmp)
-	ccache = PyCObject_AsVoidPtr(tmp);
+      ccache = CCache_get_krb5_ccache(self);
     }
 
   if(!strcmp(name, "name"))
@@ -2696,13 +2710,10 @@ CCache_setattr(PyObject *unself __UNUSED, PyObject *args)
       tmp = PyObject_GetAttrString(self, "context");
       if(tmp)
 	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
+          ctx = Context_get_krb5_context(tmp);
+          Py_DECREF(tmp);
 	}
-      tmp = PyObject_GetAttrString(self, "_ccache");
-      if(tmp)
-	ccache = PyCObject_AsVoidPtr(tmp);
+      ccache = CCache_get_krb5_ccache(self);
     }
 
   if((!strcmp(name, "context") && ctx)
@@ -2774,9 +2785,7 @@ CCache__init__(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
-  cobj = PyObject_GetAttrString(conobj, "_ctx");
-  assert(cobj);
-  ctx = PyCObject_AsVoidPtr(cobj);
+  ctx = Context_get_krb5_context(conobj);
   if(primary_principal && !PyObject_IsInstance(primary_principal, principal_class))
     {
       PyErr_Format(PyExc_TypeError, "primary_principal argument must be a Principal");
@@ -2813,10 +2822,7 @@ CCache__init__(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
       if(primary_principal)
 	{
 	  krb5_principal princ;
-	  PyObject *ppo;
-	  ppo = PyObject_GetAttrString(primary_principal, "_princ");
-	  assert(ppo);
-	  princ = PyCObject_AsVoidPtr(ppo);
+	  princ = Principal_get_krb5_principal(primary_principal);
 	  krb5_cc_initialize(ctx, cc, princ);
 	}
     }
@@ -2838,11 +2844,11 @@ PyDoc_STRVAR(CCache_eq__doc__,
     1 if the two CCache objects have the same principal name,                \n\
     None if the two CCache objects' principal names are different.           \n\
 ");
+
 static PyObject*
 CCache_eq(PyObject *unself __UNUSED, PyObject *args)
 {
-  PyObject *self, *tmp, *other;
-  krb5_context ctx = NULL;
+  PyObject *self, *other;
   krb5_ccache princ = NULL, otherprinc = NULL;
 
   if(!PyArg_ParseTuple(args, "OO:__eq__", &self, &other))
@@ -2853,17 +2859,8 @@ CCache_eq(PyObject *unself __UNUSED, PyObject *args)
       return NULL;
     }
 
-  tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
-    {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
-    }
-  tmp = PyObject_GetAttrString(self, "_ccache");
-  princ = PyCObject_AsVoidPtr(tmp);
-  tmp = PyObject_GetAttrString(other, "_ccache");
-  otherprinc = PyCObject_AsVoidPtr(tmp);
+  princ = CCache_get_krb5_ccache(self);
+  otherprinc = CCache_get_krb5_ccache(other);
 
   if(princ == otherprinc)
     return PyInt_FromLong(1);
@@ -2882,12 +2879,13 @@ PyDoc_STRVAR(CCache_principal__doc__,
 :Purpose :                                                                   \n\
     Get the Principal object for the user or service that owns the CCache.   \n\
 ");
+
 static PyObject*
 CCache_principal(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context ctx = NULL;
   krb5_ccache ccache = NULL;
-  PyObject *retval, *self, *tmp, *conobj;
+  PyObject *retval, *self, *conobj;
   krb5_principal princ = NULL;
   krb5_error_code rc;
 
@@ -2902,16 +2900,14 @@ CCache_principal(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
     }
   PyErr_Clear();
 
-  conobj = tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
+  conobj = PyObject_GetAttrString(self, "context");
+  if (conobj)
     {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
+      ctx = Context_get_krb5_context(conobj);
+      Py_DECREF(conobj);
     }
-  tmp = PyObject_GetAttrString(self, "_ccache");
-  if(tmp)
-    ccache = PyCObject_AsVoidPtr(tmp);
+
+  ccache = CCache_get_krb5_ccache(self);
 
   {
     PyObject *subargs, *otmp, *mykw = NULL;
@@ -2960,7 +2956,7 @@ static PyObject*
 CCache_init_creds_keytab(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   static const char *kwlist[] = {"self", "keytab", "principal", NULL};
-  PyObject *self, *keytab = NULL, *principal = NULL, *conobj = NULL, *tmp;
+  PyObject *self, *keytab = NULL, *principal = NULL, *conobj;
   krb5_ccache ccache = NULL;
   krb5_context ctx = NULL;
   krb5_keytab kt = NULL;
@@ -2973,31 +2969,25 @@ CCache_init_creds_keytab(PyObject *unself __UNUSED, PyObject *args, PyObject *kw
 				  &self, &keytab, &principal))
     return NULL;
 
-  conobj = tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
+  conobj = PyObject_GetAttrString(self, "context");
+  if (conobj)
     {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
+      ctx = Context_get_krb5_context(conobj);
+      Py_DECREF(ctx);
     }
-  tmp = PyObject_GetAttrString(self, "_ccache");
-  if(tmp)
-    ccache = PyCObject_AsVoidPtr(tmp);
-  tmp = PyObject_GetAttrString(keytab, "_keytab");
-  if(tmp)
-    kt = PyCObject_AsVoidPtr(tmp);
+  ccache = CCache_get_krb5_ccache(self);
+  kt = Keytab_get_krb5_keytab(keytab);
   if(principal == Py_None)
     principal = NULL;
   if(!principal)
     {
+      PyObject *tmp;
       tmp = Py_BuildValue("(O)", self);
       principal = CCache_principal(NULL, tmp, NULL);
       Py_DECREF(tmp);
     }
-  tmp = PyObject_GetAttrString(principal, "_princ");
-  if(tmp)
-    princ = PyCObject_AsVoidPtr(tmp);
-  else
+  princ = Principal_get_krb5_principal(principal);
+  if(!princ)
     return NULL;
   memset(&my_creds, 0, sizeof(my_creds));
 
@@ -3037,7 +3027,7 @@ static PyObject*
 CCache_initialize(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   static const char *kwlist[] = {"self", "principal", NULL};
-  PyObject *self, *principal = NULL, *conobj = NULL, *tmp;
+  PyObject *self, *principal = NULL, *conobj;
   krb5_ccache ccache = NULL;
   krb5_context ctx = NULL;
   krb5_principal princ = NULL;
@@ -3047,16 +3037,13 @@ CCache_initialize(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 				  &self, &principal))
     return NULL;
 
-  conobj = tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
+  conobj = PyObject_GetAttrString(self, "context");
+  if(conobj)
     {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
+      ctx = Context_get_krb5_context(conobj);
+      Py_DECREF(conobj);
     }
-  tmp = PyObject_GetAttrString(self, "_ccache");
-  if(tmp)
-    ccache = PyCObject_AsVoidPtr(tmp);
+  ccache = CCache_get_krb5_ccache(self);
   if(principal == Py_None)
     principal = NULL;
   if(!principal)
@@ -3064,10 +3051,8 @@ CCache_initialize(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
       PyErr_SetNone(PyExc_ValueError);
       return NULL;
     }
-  tmp = PyObject_GetAttrString(principal, "_princ");
-  if(tmp)
-    princ = PyCObject_AsVoidPtr(tmp);
-  else
+  princ = Principal_get_krb5_principal(principal);
+  if(!princ)
     return NULL;
 
   rc = krb5_cc_initialize(ctx, ccache, princ);
@@ -3114,7 +3099,7 @@ CCache_get_credentials(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
   krb5_context ctx = NULL;
   krb5_ccache ccache = NULL;
-  PyObject *retval, *self, *tmp, *conobj, *client, *server, *adlist, *addrlist, *subtmp=NULL, *authdata_tmp=NULL;
+  PyObject *retval, *self, *conobj, *tmp, *client, *server, *adlist, *addrlist, *subtmp=NULL, *authdata_tmp=NULL;
   krb5_flags options;
   krb5_error_code rc;
   krb5_creds in_creds, *out_creds = NULL;
@@ -3193,21 +3178,17 @@ CCache_get_credentials(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
       in_creds.authdata = adata_ptrs;
     }
 
-  tmp = PyObject_GetAttrString(client, "_princ");
-  if(!tmp) return NULL;
-  in_creds.client = PyCObject_AsVoidPtr(tmp);
-  tmp = PyObject_GetAttrString(server, "_princ");
-  if(!tmp) return NULL;
-  in_creds.server = PyCObject_AsVoidPtr(tmp);
-
-  conobj = tmp = PyObject_GetAttrString(self, "context");
-  if(!tmp) return NULL;
-  tmp = PyObject_GetAttrString(tmp, "_ctx");
-  if(!tmp) return NULL;
-  ctx = PyCObject_AsVoidPtr(tmp);
-  tmp = PyObject_GetAttrString(self, "_ccache");
-  if(!tmp) return NULL;
-  ccache = PyCObject_AsVoidPtr(tmp);
+  in_creds.client = Principal_get_krb5_principal(client);
+  if(!in_creds.client)
+    return NULL;
+  in_creds.server = Principal_get_krb5_principal(server);
+  if(!in_creds.server)
+    return NULL;
+  conobj = PyObject_GetAttrString(self, "context");
+  if(!conobj) return NULL;
+  ctx = Context_get_krb5_context(conobj);
+  Py_DECREF(conobj);
+  ccache = CCache_get_krb5_ccache(self);
 
   rc = krb5_get_credentials(ctx, options, ccache, &in_creds, &out_creds);
   if(rc)
@@ -3351,13 +3332,10 @@ RCache_setattr(PyObject *unself __UNUSED, PyObject *args)
       tmp = PyObject_GetAttrString(self, "context");
       if(tmp)
 	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
+          ctx = Context_get_krb5_context(tmp);
+          Py_DECREF(tmp);
 	}
-      tmp = PyObject_GetAttrString(self, "_rcache");
-      if(tmp)
-	rcache = PyCObject_AsVoidPtr(tmp);
+      rcache = RCache_get_krb5_rcache(self);
     }
 
   if((!strcmp(name, "context") && ctx)
@@ -3414,9 +3392,7 @@ RCache_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
-  cobj = PyObject_GetAttrString(conobj, "_ctx");
-  assert(cobj);
-  ctx = PyCObject_AsVoidPtr(cobj);
+  ctx = Context_get_krb5_context(conobj);
 
   if(new_rc_name)
     {
@@ -3463,8 +3439,7 @@ PyDoc_STRVAR(RCache_eq__doc__,
 static PyObject*
 RCache_eq(PyObject *unself __UNUSED, PyObject *args)
 {
-  PyObject *self, *tmp, *other;
-  krb5_context ctx = NULL;
+  PyObject *self, *other;
   krb5_rcache princ = NULL, otherprinc = NULL;
 
   if(!PyArg_ParseTuple(args, "OO:__eq__", &self, &other))
@@ -3475,17 +3450,8 @@ RCache_eq(PyObject *unself __UNUSED, PyObject *args)
       return NULL;
     }
 
-  tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
-    {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
-    }
-  tmp = PyObject_GetAttrString(self, "_rcache");
-  princ = PyCObject_AsVoidPtr(tmp);
-  tmp = PyObject_GetAttrString(other, "_rcache");
-  otherprinc = PyCObject_AsVoidPtr(tmp);
+  princ = RCache_get_krb5_rcache(self);
+  otherprinc = RCache_get_krb5_rcache(other);
 
   if(princ == otherprinc)
     return PyInt_FromLong(1);
@@ -3564,13 +3530,10 @@ Keytab_getattr(PyObject *unself __UNUSED, PyObject *args)
       tmp = PyObject_GetAttrString(self, "context");
       if(tmp)
 	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
+          ctx = Context_get_krb5_context(tmp);
+          Py_DECREF(tmp);
 	}
-      tmp = PyObject_GetAttrString(self, "_keytab");
-      if(tmp)
-	keytab = PyCObject_AsVoidPtr(tmp);
+      keytab = Keytab_get_krb5_keytab(self);
     }
 
   if(!strcmp(name, "name"))
@@ -3626,13 +3589,10 @@ Keytab_setattr(PyObject *unself __UNUSED, PyObject *args)
       tmp = PyObject_GetAttrString(self, "context");
       if(tmp)
 	{
-	  tmp = PyObject_GetAttrString(tmp, "_ctx");
-	  if(tmp)
-	    ctx = PyCObject_AsVoidPtr(tmp);
+          ctx = Context_get_krb5_context(tmp);
+          Py_DECREF(tmp);
 	}
-      tmp = PyObject_GetAttrString(self, "_keytab");
-      if(tmp)
-	keytab = PyCObject_AsVoidPtr(tmp);
+      keytab = Keytab_get_krb5_keytab(self);
     }
 
   if((!strcmp(name, "context") && ctx)
@@ -3704,9 +3664,7 @@ Keytab_init(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
   if(!conobj)
     conobj = pk_default_context(NULL, NULL);
   assert(conobj);
-  cobj = PyObject_GetAttrString(conobj, "_ctx");
-  assert(cobj);
-  ctx = PyCObject_AsVoidPtr(cobj);
+  ctx = Context_get_krb5_context(conobj);
 
   if(new_kt)
     {
@@ -3755,8 +3713,7 @@ PyDoc_STRVAR(Keytab_eq__doc__,
 static PyObject*
 Keytab_eq(PyObject *unself __UNUSED, PyObject *args)
 {
-  PyObject *self, *tmp, *other;
-  krb5_context ctx = NULL;
+  PyObject *self, *other;
   krb5_keytab princ = NULL, otherprinc = NULL;
 
   if(!PyArg_ParseTuple(args, "OO:__eq__", &self, &other))
@@ -3767,17 +3724,8 @@ Keytab_eq(PyObject *unself __UNUSED, PyObject *args)
       return NULL;
     }
 
-  tmp = PyObject_GetAttrString(self, "context");
-  if(tmp)
-    {
-      tmp = PyObject_GetAttrString(tmp, "_ctx");
-      if(tmp)
-	ctx = PyCObject_AsVoidPtr(tmp);
-    }
-  tmp = PyObject_GetAttrString(self, "_keytab");
-  princ = PyCObject_AsVoidPtr(tmp);
-  tmp = PyObject_GetAttrString(other, "_keytab");
-  otherprinc = PyCObject_AsVoidPtr(tmp);
+  princ = Keytab_get_krb5_keytab(self);
+  otherprinc = Keytab_get_krb5_keytab(other);
 
   if(princ == otherprinc)
     return PyInt_FromLong(1);
