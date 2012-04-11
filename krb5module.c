@@ -140,6 +140,41 @@ Keytab_get_krb5_keytab(PyObject *self)
   return NULL;
 }
 
+static PyObject *
+make_class(PyObject *module,
+           const char *name,
+           PyMethodDef methods[],
+           PyMethodDef *getattr,
+           PyMethodDef *setattr)
+{
+  PyMethodDef *def;
+  PyObject *dict;
+  PyObject *nameobj;
+  PyObject *retval;
+  PyClassObject *klass;
+
+  dict = PyDict_New();
+  nameobj = PyString_FromString(name);
+
+  retval = PyClass_New(NULL, dict, nameobj);
+  klass = (PyClassObject *)retval;
+
+  PyObject_SetAttrString(retval, "__module__", module);
+
+  for(def = methods; def->ml_name; def++)
+    {
+      PyObject *func = PyCFunction_New(def, NULL);
+      PyObject *method = PyMethod_New(func, NULL, retval);
+      PyDict_SetItemString(dict, def->ml_name, method);
+      Py_DECREF(func);
+      Py_DECREF(method);
+    }
+  klass->cl_getattr = PyMethod_New(PyCFunction_New(getattr, NULL), NULL, retval);
+  klass->cl_setattr = PyMethod_New(PyCFunction_New(setattr, NULL), NULL, retval);
+
+  return retval;
+}
+
 PyDoc_STRVAR(Context_init__doc__,
 "__init__() -> KrbV.Context                                                  \n\
                                                                              \n\
@@ -1581,31 +1616,15 @@ static PyMethodDef context_methods[] = {
 static PyObject *
 pk_context_make_class(PyObject *module)
 {
-  PyMethodDef *def;
   static PyMethodDef
     getattr = {"__getattr__", Context_getattr, METH_VARARGS, Context_getattr__doc__},
     setattr = {"__setattr__", Context_setattr, METH_VARARGS, Context_setattr__doc__};
-  PyObject *dict, *name, *retval;
-  PyClassObject *klass;
-  dict = PyDict_New();
-  name = PyString_FromString("Context");
 
-  retval = PyClass_New(NULL, dict, name);
-  klass = (PyClassObject *)retval;
-
-  PyObject_SetAttrString(retval, "__module__", module);
-  for(def = context_methods; def->ml_name; def++)
-    {
-      PyObject *func = PyCFunction_New(def, NULL);
-      PyObject *method = PyMethod_New(func, NULL, retval);
-      PyDict_SetItemString(dict, def->ml_name, method);
-      Py_DECREF(func);
-      Py_DECREF(method);
-    }
-  klass->cl_getattr = PyMethod_New(PyCFunction_New(&getattr, NULL), NULL, retval);
-  klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
-
-  return retval;
+  return make_class(module,
+                    "Context",
+                    context_methods,
+                    &getattr,
+                    &setattr);
 }
 
 /* Convert a string representation of an address to a krb5_address */
@@ -2156,33 +2175,15 @@ static PyMethodDef auth_context_methods[] = {
 static PyObject *
 pk_auth_context_make_class(PyObject *module)
 {
-  PyMethodDef *def;
   static PyMethodDef
     getattr = {"__getattr__", AuthContext_getattr, METH_VARARGS, AuthContext_getattr__doc__},
     setattr = {"__setattr__", AuthContext_setattr, METH_VARARGS, AuthContext_setattr__doc__};
-  PyObject *dict, *name, *retval;
-  PyClassObject *klass;
 
-  dict = PyDict_New();
-  name = PyString_FromString("AuthContext");
-
-  retval = PyClass_New(NULL, dict, name);
-  klass = (PyClassObject *)retval;
-
-  PyObject_SetAttrString(retval, "__module__", module);
-  for(def = auth_context_methods; def->ml_name; def++)
-    {
-      PyObject *func = PyCFunction_New(def, NULL);
-      PyObject *method = PyMethod_New(func, NULL, retval);
-      PyDict_SetItemString(dict, def->ml_name, method);
-      Py_DECREF(func);
-      Py_DECREF(method);
-    }
-
-  klass->cl_getattr = PyMethod_New(PyCFunction_New(&getattr, NULL), NULL, retval);
-  klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
-
-  return retval;
+  return make_class(module,
+                    "AuthContext",
+                    auth_context_methods,
+                    &getattr,
+                    &setattr);
 }
 
 /************************* Principal **********************************/
@@ -2579,32 +2580,15 @@ static PyMethodDef principal_methods[] = {
 static PyObject *
 pk_principal_make_class(PyObject *module)
 {
-  PyMethodDef *def;
   static PyMethodDef
     getattr = {"__getattr__", Principal_getattr, METH_VARARGS, Principal_getattr__doc__},
     setattr = {"__setattr__", Principal_setattr, METH_VARARGS, Principal_setattr__doc__};
-  PyObject *dict, *name, *retval;
-  PyClassObject *klass;
 
-  dict = PyDict_New();
-  name = PyString_FromString("Principal");
-
-  retval = PyClass_New(NULL, dict, name);
-  klass = (PyClassObject *)retval;
-
-  PyObject_SetAttrString(retval, "__module__", module);
-  for(def = principal_methods; def->ml_name; def++)
-    {
-      PyObject *func = PyCFunction_New(def, NULL);
-      PyObject *method = PyMethod_New(func, NULL, retval);
-      PyDict_SetItemString(dict, def->ml_name, method);
-      Py_DECREF(func);
-      Py_DECREF(method);
-    }
-  klass->cl_getattr = PyMethod_New(PyCFunction_New(&getattr, NULL), NULL, retval);
-  klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
-
-  return retval;
+  return make_class(module,
+                    "Principal",
+                    principal_methods,
+                    &getattr,
+                    &setattr);
 }
 
 /************************* Creds cache **********************************/
@@ -3252,32 +3236,11 @@ static PyMethodDef ccache_methods[] = {
 static PyObject *
 pk_ccache_make_class(PyObject *module)
 {
-  PyMethodDef *def;
   static PyMethodDef
     getattr = {"__getattr__", CCache_getattr, METH_VARARGS, CCache_getattr__doc__},
     setattr = {"__setattr__", CCache_setattr, METH_VARARGS, CCache_setattr__doc__};
-  PyObject *dict, *name, *retval;
-  PyClassObject *klass;
 
-  dict = PyDict_New();
-  name = PyString_FromString("CCache");
-
-  retval = PyClass_New(NULL, dict, name);
-  klass = (PyClassObject *)retval;
-
-  PyObject_SetAttrString(retval, "__module__", module);
-  for(def = ccache_methods; def->ml_name; def++)
-    {
-      PyObject *func = PyCFunction_New(def, NULL);
-      PyObject *method = PyMethod_New(func, NULL, retval);
-      PyDict_SetItemString(dict, def->ml_name, method);
-      Py_DECREF(func);
-      Py_DECREF(method);
-    }
-  klass->cl_getattr = PyMethod_New(PyCFunction_New(&getattr, NULL), NULL, retval);
-  klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
-
-  return retval;
+  return make_class(module, "CCache", ccache_methods, &getattr, &setattr);
 }
 
 /************************* replay cache **********************************/
@@ -3469,32 +3432,15 @@ static PyMethodDef rcache_methods[] = {
 static PyObject *
 pk_rcache_make_class(PyObject *module)
 {
-  PyMethodDef *def;
   static PyMethodDef
     getattr = {"__getattr__", RCache_getattr, METH_VARARGS, RCache_getattr__doc__},
     setattr = {"__setattr__", RCache_setattr, METH_VARARGS, RCache_setattr__doc__};
-  PyObject *dict, *name, *retval;
-  PyClassObject *klass;
 
-  dict = PyDict_New();
-  name = PyString_FromString("RCache");
-
-  retval = PyClass_New(NULL, dict, name);
-  klass = (PyClassObject *)retval;
-
-  PyObject_SetAttrString(retval, "__module__", module);
-  for(def = rcache_methods; def->ml_name; def++)
-    {
-      PyObject *func = PyCFunction_New(def, NULL);
-      PyObject *method = PyMethod_New(func, NULL, retval);
-      PyDict_SetItemString(dict, def->ml_name, method);
-      Py_DECREF(func);
-      Py_DECREF(method);
-    }
-  klass->cl_getattr = PyMethod_New(PyCFunction_New(&getattr, NULL), NULL, retval);
-  klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
-
-  return retval;
+  return make_class(module,
+                    "RCache",
+                    rcache_methods,
+                    &getattr,
+                    &setattr);
 }
 
 /************************* keytab **********************************/
@@ -3743,32 +3689,14 @@ static PyMethodDef keytab_methods[] = {
 static PyObject *
 pk_keytab_make_class(PyObject *module)
 {
-  PyMethodDef *def;
   static PyMethodDef
     getattr = {"__getattr__", Keytab_getattr, METH_VARARGS, Keytab_getattr__doc__},
     setattr = {"__setattr__", Keytab_setattr, METH_VARARGS, Keytab_setattr__doc__};
-  PyObject *dict, *name, *retval;
-  PyClassObject *klass;
-
-  dict = PyDict_New();
-  name = PyString_FromString("Keytab");
-
-  retval = PyClass_New(NULL, dict, name);
-  klass = (PyClassObject *)retval;
-
-  PyObject_SetAttrString(retval, "__module__", module);
-  for(def = keytab_methods; def->ml_name; def++)
-    {
-      PyObject *func = PyCFunction_New(def, NULL);
-      PyObject *method = PyMethod_New(func, NULL, retval);
-      PyDict_SetItemString(dict, def->ml_name, method);
-      Py_DECREF(func);
-      Py_DECREF(method);
-    }
-  klass->cl_getattr = PyMethod_New(PyCFunction_New(&getattr, NULL), NULL, retval);
-  klass->cl_setattr = PyMethod_New(PyCFunction_New(&setattr, NULL), NULL, retval);
-
-  return retval;
+  return make_class(module,
+                    "Keytab",
+                    keytab_methods,
+                    &getattr,
+                    &setattr);
 } /* pk_keytab_make_class() */
 
 /****** main module ********/
