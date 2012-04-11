@@ -339,8 +339,7 @@ PyDoc_STRVAR(Context_kt_default__doc__,
 static PyObject*
 Context_kt_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
 {
-  krb5_context kctx = NULL;
-  PyObject *ctx, *retval, *self;
+  PyObject *retval, *self;
 
   if(!PyArg_ParseTuple(args, "O:default_keytab", &self))
     return NULL;
@@ -350,9 +349,6 @@ Context_kt_default(PyObject *unself __UNUSED, PyObject *args, PyObject *kw)
     return retval;
 
   PyErr_Clear();
-
-  ctx = PyObject_GetAttrString(self, "_ctx");
-  kctx = PyCObject_AsVoidPtr(ctx);
 
   {
     PyObject *args, *mykw = NULL;
